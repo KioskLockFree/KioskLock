@@ -1,0 +1,880 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head><script>window.KL_FREE=true;</script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>עריכת הצג</title>
+<!--
+  ============================================================================
+   עריכת הצג — הדף שהגבאי פותח מהקישור של בית הכנסת שלו.
+
+   THE WHOLE PAGE IS A HOST. It contains no settings UI of its own: it loads the REAL admin.html (in its
+   "צג חכם לבית כנסת" mode) and the REAL kiosk.html (in its layout-editor mode) into iframes and stands in
+   for the program that normally hosts them. Both pages talk to their host through exactly one channel —
+   window.chrome.webview — so a stub of that object is the entire trick. It is the same trick the fleet
+   console already runs for admin.html, and it was measured to work for the LAYOUT EDITOR too (a suite ran
+   both frames over real HTTP before this file was written: the stage came up with its components, the
+   ribbon built itself, and "שמור פריסה" posted ssdLayout).
+
+   Nothing here is a second copy of anything. A copied editor would age against the one the stations run —
+   older, and it silently drops fields the display has; newer, and it writes fields the display does not
+   know. release.ps1 generates the whole site folder from the very admin.html and kiosk.html that were just
+   released, and this page is in that list beside them.
+
+   WHAT THE GABBAI MAY DO: everything under the display's own key — the boards, the layout, the colours, the
+   announcements, the events and yahrzeits — and the prayer-times data he shares with the station.
+   WHAT HE MAY NOT: anything that happens ON the machine. Those are refused out loud (see hostSay), never
+   swallowed: a button that does nothing and says nothing is the worst answer a page can give.
+
+   THE SECRET IS IN THE FRAGMENT. edit.html#<machine_id>.<token> — a fragment is never sent to the server,
+   so it stays out of the host's access log and out of the filtering proxy these stations sit behind. It
+   travels only in the body of the two RPCs that check it.
+  ============================================================================
+-->
+<script>
+  // Same project as the console (fleet\index.html). The anon key is MEANT to be public — ssd_fetch and
+  // ssd_push are the only things it can reach here, and both demand the per-station token.
+  const SUPABASE_URL = "https://cvpvxyvjpxfmzdnykkkv.supabase.co";
+  const SUPABASE_ANON_KEY = "sb_publishable_1X7rzFvgJl0SZwNVXnp3Bg_wgIcBxxO";
+
+  // The fonts the program carries, by name. This is only a FALLBACK for the moment before ssd-fonts.js has
+  // been fetched (and for the case where it cannot be): that generated file carries both the families and
+  // their BYTES, and the list below is replaced by the one it declares. Deriving it rather than keeping a
+  // second copy is the point — a hand-typed list goes on offering ten families the day an eleventh is added
+  // to fonts.json, every one of them still rendering perfectly, and nothing anywhere reports the gap.
+  // The "system" list is deliberately EMPTY: a font installed on whatever computer the gabbai happens to be
+  // using would not travel to the display at all.
+  let SSD_EMBEDDED_FONTS = ["Heebo", "Rubik", "Assistant", "Alef", "Frank Ruhl Libre",
+                            "Noto Sans Hebrew", "Noto Serif Hebrew", "Miriam Libre", "Secular One", "Suez One"];
+</script>
+<style>
+  /* Light or dark like the console: the system's choice, or the page's own button (kept in this browser). The
+     settings frame and the layout editor inside follow THIS page (USER 2026-09-20: "האתר בהיר אבל ההגדרות כהות"). */
+  :root { --bg:#0b1020; --panel:#121a2e; --panel-2:#1b2540; --border:#263251; --ink:#e8ecf6; --ink-2:#a8b3cc;
+          --accent:#6d8cff; --accent-ink:#0b1020; --good:#4ec77a; --warn:#e0a33a; --crit:#e2564a; --ov:rgba(4,8,18,.9); --toast:#16203a; }
+  @media (prefers-color-scheme: light) { :root:not([data-theme="dark"]) {
+    --bg:#f3f5fa; --panel:#ffffff; --panel-2:#e9eef8; --border:#d6dcea; --ink:#15203a; --ink-2:#5b6785;
+    --accent:#2f6df4; --accent-ink:#ffffff; --good:#1f9d55; --warn:#b9770a; --crit:#d23b3b; --ov:rgba(20,30,60,.55); --toast:#ffffff; } }
+  :root[data-theme="light"] {
+    --bg:#f3f5fa; --panel:#ffffff; --panel-2:#e9eef8; --border:#d6dcea; --ink:#15203a; --ink-2:#5b6785;
+    --accent:#2f6df4; --accent-ink:#ffffff; --good:#1f9d55; --warn:#b9770a; --crit:#d23b3b; --ov:rgba(20,30,60,.55); --toast:#ffffff; }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:14px "Segoe UI", Arial, sans-serif;
+         display:flex; flex-direction:column; }
+  header { display:flex; align-items:center; gap:12px; padding:8px 14px; background:var(--panel);
+           border-bottom:1px solid var(--border); flex:0 0 auto; flex-wrap:wrap; }
+  header .nm { font-weight:700; font-size:15px; }
+  header .sub { color:var(--ink-2); font-size:12px; }
+  .badge { padding:3px 9px; border-radius:999px; font-size:12px; border:1px solid var(--border); }
+  .b-good { color:var(--good); border-color:#2c5b3d; } .b-warn { color:var(--warn); border-color:#5b4a2c; }
+  .b-idle { color:var(--ink-2); }
+  #frameWrap { flex:1 1 auto; position:relative; min-height:0; }
+  #admFrame { width:100%; height:100%; border:0; background:var(--panel); display:none; }
+  #gate { position:absolute; inset:0; display:grid; place-items:center; padding:24px; text-align:center; }
+  .card { background:var(--panel); border:1px solid var(--border); border-radius:14px; padding:22px 26px; max-width:520px; }
+  .card h1 { font-size:18px; margin:0 0 10px; }
+  .card p { color:var(--ink-2); line-height:1.6; margin:8px 0; }
+  .spin { width:26px; height:26px; margin:0 auto 12px; border:3px solid var(--border);
+          border-top-color:var(--accent); border-radius:50%; animation:sp 1s linear infinite; }
+  @keyframes sp { to { transform: rotate(360deg); } }
+  /* The layout editor / preview, over everything. It is a 1920x1080 page scaled to fit, so the gabbai sees
+     the proportions of a real screen and not a squeeze of one. */
+  #ovWrap { position:fixed; inset:0; z-index:200; background:var(--ov); display:none;
+            flex-direction:column; padding:10px; gap:8px; }
+  #ovWrap.open { display:flex; }
+  #ovHead { display:flex; align-items:center; gap:12px; flex:0 0 auto; flex-wrap:wrap; }
+  #ovBox { position:relative; flex:1 1 auto; overflow:hidden; border-radius:10px; background:#000; }
+  #ovFrame { position:absolute; border:0; transform-origin:top left; background:var(--bg); }
+  button { font:inherit; cursor:pointer; background:var(--panel-2); color:var(--ink);
+           border:1px solid var(--border); border-radius:8px; padding:6px 13px; }
+  button.pri { background:var(--accent); border-color:var(--accent); color:var(--accent-ink); font-weight:600; }
+  button:hover { filter:brightness(1.12); }
+  #toast { position:fixed; left:0; right:0; bottom:20px; margin:0 auto; width:max-content; max-width:80vw;
+           background:var(--toast); color:var(--ink); border:1px solid var(--accent); border-radius:10px;
+           padding:10px 16px; z-index:9999; text-align:center; display:none;
+           box-shadow:0 8px 24px rgba(0,0,0,.5); }
+</style>
+</head>
+<body>
+
+<header>
+  <span class="nm" id="hName">עריכת הצג</span>
+  <span class="sub" id="hSub"></span>
+  <span class="status" id="hStatus" style="margin-inline-start:auto; display:flex; align-items:center; gap:10px; flex-wrap:wrap">
+    <span class="sub" id="hSeen" title=""></span>
+    <span class="sub" id="hVer"></span>
+    <span class="badge b-idle" id="hSync">—</span>
+    <!-- "הוכחת תצוגה": what the display's own screen actually looks like, sent by it every ten minutes. -->
+    <button id="shotBtn" title="מה באמת על הקיר עכשיו" style="padding:4px 10px; font-size:12px; display:none">📷 הקיר</button>
+    <button id="themeBtn" title="מצב תצוגה: לפי המערכת / בהיר / כהה" style="padding:4px 10px; font-size:12px">מצב: מערכת</button>
+  </span>
+</header>
+
+<!-- The proof picture, over everything, dismissed by a click anywhere. -->
+<div id="shotOv" style="position:fixed; inset:0; z-index:60; background:rgba(0,0,0,.82); display:none; align-items:center; justify-content:center; padding:24px; cursor:zoom-out">
+  <div style="max-width:min(1200px,94vw); text-align:center">
+    <img id="shotImg" alt="" style="max-width:100%; max-height:78vh; border-radius:10px; border:1px solid rgba(255,255,255,.25); display:block; margin:0 auto">
+    <div id="shotCap" style="color:#d7deee; font-size:13px; margin-top:10px"></div>
+  </div>
+</div>
+
+<div id="frameWrap">
+  <iframe id="admFrame" title="עריכת הצג"></iframe>
+  <div id="gate">
+    <div class="card" id="gateCard">
+      <div class="spin"></div>
+      <h1>טוען…</h1>
+      <p>מביא את הגדרות הצג של בית הכנסת.</p>
+    </div>
+  </div>
+</div>
+
+<div id="ovWrap">
+  <div id="ovHead">
+    <b id="ovTitle">עורך הפריסה</b>
+    <span class="sub" id="ovNote"></span>
+    <button id="ovClose" style="margin-inline-start:auto">סגור</button>
+  </div>
+  <div id="ovBox"><iframe id="ovFrame" title="עורך הפריסה"></iframe></div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+  const $ = s => document.querySelector(s);
+  const REST = SUPABASE_URL.replace(/\/$/, "") + "/rest/v1";
+  // THE LAN MODE (USER 2026-09-24: "ניהול ההגדרות של הצג החכם והפריסה — גם ברשת המקומית"). The station's LAN portal
+  // (RemoteAdminPortal, "עריכת הצג החכם") serves THIS page with window.KL_LAN = { token } set ahead of it, and then
+  // every call below goes to the station itself (/api/ssd/…) instead of the server: the settings are the live ones,
+  // a save lands on the station's disk at once, and a picked file is copied into the display's own folder — exactly
+  // what a pick in the display's window does. One editor for the site and the LAN, not two that drift apart.
+  const LAN = window.KL_LAN || null;
+  const SCREEN_W = 1920, SCREEN_H = 1080;
+
+  // ---- the link ----------------------------------------------------------------------------------------
+  // "#<machine_id>.<token>", or "#<machine_id>.<token>/layout" to open straight onto the graphical layout editor
+  // (USER 2026-09-17). The machine id is hex and the token is hex, so one dot separates them; a "/layout" tail is
+  // split off first. Both ids are hex, so it can never be mistaken for part of the token.
+  const rawHash = decodeURIComponent((location.hash || "").replace(/^#/, ""));
+  // "/g=<name>" carries the gabbai's own name (USER 2026-09-18): the console issues a link per gabbai, so when
+  // two of them edit the same display the second sees "פלוני עורך כעת" and can look on or take over. The name is
+  // only a courtesy label — the per-station token is still the one thing that authorises anything — so it is
+  // pulled off first, before the token is read, and may sit before or after a "/layout" tail in any order.
+  const gMatch = /\/g=([^/]*)/i.exec(rawHash);
+  const EDITOR_NAME = gMatch ? gMatch[1].trim() : "";
+  const noG = rawHash.replace(/\/g=[^/]*/i, "");
+  // "/layout" opens the graphical editor; "/layout:<setId>" opens it on that named set.
+  const layoutMatch = /\/layout(?::([^/]+))?$/i.exec(noG);
+  const STRAIGHT_TO_LAYOUT = !!layoutMatch;
+  const LAYOUT_SET = layoutMatch && layoutMatch[1] ? layoutMatch[1] : "";
+  const hash = noG.replace(/\/layout(?::[^/]+)?$/i, "");
+  const dot = hash.indexOf(".");
+  const MACHINE = LAN ? "lan" : dot > 0 ? hash.slice(0, dot) : "";
+  const TOKEN = LAN ? String(LAN.token || "") : dot > 0 ? hash.slice(dot + 1) : "";
+
+  // ---- light / dark: the page's own choice (kept in this browser), the system otherwise ------------------------
+  const themeMq = window.matchMedia("(prefers-color-scheme: dark)");
+  let tmode = 0;   // 0 system, 1 light, 2 dark
+  try { tmode = +localStorage.getItem("klEditTheme") || 0; } catch (e) { }
+  function pageTheme() { return tmode === 1 ? "light" : tmode === 2 ? "dark" : (themeMq.matches ? "dark" : "light"); }
+  function applyPageTheme() {
+    const root = document.documentElement;
+    if (tmode === 1) root.setAttribute("data-theme", "light"); else if (tmode === 2) root.setAttribute("data-theme", "dark"); else root.removeAttribute("data-theme");
+    const b = document.getElementById("themeBtn"); if (b) b.textContent = tmode === 1 ? "מצב: בהיר" : tmode === 2 ? "מצב: כהה" : "מצב: מערכת";
+    // the settings frame follows (admin.html's uiTheme message); the layout editor is opened with the frame's theme
+    try { const f = $("#admFrame"); if (f && f.contentWindow && f.contentWindow.KLDeliver) deliver(f, { action: "uiTheme", theme: pageTheme() }); } catch (e) { }
+  }
+  applyPageTheme();
+  try { themeMq.addEventListener("change", () => { if (tmode === 0) applyPageTheme(); }); } catch (e) { }
+  document.getElementById("themeBtn").addEventListener("click", () => { tmode = (tmode + 1) % 3; try { localStorage.setItem("klEditTheme", String(tmode)); } catch (e) { } applyPageTheme(); });
+
+  let S = null;              // the settings-shaped object the two pages are fed
+  let META = null;           // { name, rev, applied, version, lastSeen } from ssd_fetch
+  let admHtml = null, kioskHtml = null, fontsJs = "", pdfModJs = "";
+
+  function gateFail(title, body) {
+    $("#gateCard").innerHTML = "<h1>" + title + "</h1><p>" + body + "</p>";
+    $("#gate").style.display = "grid";
+  }
+  function toast(t) {
+    const el = $("#toast");
+    el.textContent = t; el.style.display = "";
+    clearTimeout(el._t); el._t = setTimeout(() => { el.style.display = "none"; }, 4000);
+  }
+
+  // Over the LAN the station answers the same questions under its own names (RemoteAdminPortal, /api/ssd/…).
+  const LAN_FN = { ssd_fetch: "fetch", ssd_push: "push" };
+  async function lanCall(fn, body) {
+    const r = await fetch("/api/ssd/" + fn, {
+      method: "POST", cache: "no-store", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(Object.assign({}, body || {}, { token: TOKEN }))
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!j || !j.ok) {
+      if (j && j.expired) throw new Error("הכניסה פגה — חזרו לעמוד השליטה מרחוק והתחברו שוב.");
+      throw new Error((j && j.message) || ("HTTP " + r.status));
+    }
+    return j;
+  }
+  async function rpc(fn, body) {
+    if (LAN) {
+      if (!LAN_FN[fn]) throw new Error("לא זמין ברשת המקומית");
+      return lanCall(LAN_FN[fn], body);
+    }
+    const r = await fetch(REST + "/rpc/" + fn, {
+      method: "POST", cache: "no-store",
+      headers: { "apikey": SUPABASE_ANON_KEY, "Authorization": "Bearer " + SUPABASE_ANON_KEY,
+                 "Content-Type": "application/json" },
+      body: JSON.stringify(body || {})
+    });
+    if (!r.ok) {
+      const e = await r.json().catch(() => ({}));
+      const msg = String(e.message || e.hint || ("HTTP " + r.status));
+      // "unauthorized" out of these two functions means the link, not the login — there is no login here.
+      if (/unauthorized/i.test(msg)) throw new Error("הקישור אינו תקף יותר.");
+      if (r.status === 404) throw new Error("השרת אינו מוכן לעריכה מרחוק (חסרה ההתקנה של עריכת הצג).");
+      throw new Error(msg);
+    }
+    return r.json();
+  }
+
+  // ---- remote media upload (USER 2026-09-18) -----------------------------------------------------------
+  // A gabbai editing from a phone/PC has no local file the display can read. So a picked picture is uploaded to
+  // Supabase Storage through the ssd-media function (which checks the same per-station token), and the layout
+  // keeps only its URL. The display is online — it loads the picture straight from that URL. The upload never
+  // touches the exe: kiosk.html stores the URL as imageData with NO local `image` path, so the station's picture
+  // resolver leaves it alone. See fleet/ssd-media-setup.md for the bucket + function this needs.
+  const FUNCS = SUPABASE_URL.replace(/\/$/, "") + "/functions/v1";
+  let _upBusy = false;
+  function pickLocalFile(accept, onFile) {
+    const inp = document.createElement("input");
+    inp.type = "file"; inp.accept = accept; inp.style.display = "none";
+    inp.onchange = () => { const file = inp.files && inp.files[0]; inp.remove(); if (file) onFile(file); };
+    document.body.appendChild(inp); inp.click();
+  }
+  // A picture or a video: uploaded whole, and the URL goes back the way the station's own pick would have gone.
+  // Two askers: the layout editor's ssdPickImage (target/id/key → ssdImagePicked) and the display window's
+  // ssdPickFile (kind/tag → ssdFilePicked, the same message it gets from SsdDisplay.PickFile).
+  function ssdUploadPick(m, frameSel) {
+    if (_upBusy) { toast("רגע — עדיין מעלה את הקודם."); return; }
+    const video = m.kind === "video";
+    const maxMB = video ? 60 : 8, what = video ? "הסרטון" : "התמונה";
+    pickLocalFile(video ? "video/*" : "image/*", async file => {
+      if (file.size > maxMB * 1024 * 1024) { toast(what + " גדול מדי — עד " + maxMB + "MB."); return; }
+      _upBusy = true; toast("מעלה" + (video ? " סרטון (עשוי לקחת זמן)…" : " תמונה…"));
+      try {
+        if (LAN) {
+          // Copied into the display's own folder on the station: the answer is the station's own pick — a path, and
+          // the picture's bytes for the page to draw — not a URL.
+          const up = await lanUpload(file, video ? "video" : "image");
+          if (m.action === "ssdPickFile") deliver($(frameSel), { action: "ssdFilePicked", kind: m.kind || "image", tag: m.tag, path: up.path, data: up.data, name: file.name });
+          else deliver($(frameSel), { action: "ssdImagePicked", target: m.target, id: m.id, key: m.key, path: up.path, data: up.data });
+          toast(what + " נוסף.");
+          return;
+        }
+        const url = await ssdUploadFile(file);
+        if (m.action === "ssdPickFile") deliver($(frameSel), { action: "ssdFilePicked", kind: m.kind || "image", tag: m.tag, url: url, name: file.name });
+        else deliver($(frameSel), { action: "ssdImagePicked", target: m.target, id: m.id, key: m.key, url: url });
+        toast(what + " הועלה.");
+      } catch (e) { toast("ההעלאה נכשלה: " + ((e && e.message) || "שגיאה")); }
+      finally { _upBusy = false; }
+    });
+  }
+  // A PDF (USER 2026-09-18). The file itself is never uploaded: the PAGE cuts it into page pictures (KLPdf, the
+  // same module as on the station) and hands them back as ssdSavePages — where the station writes files, this
+  // uploads each page to Storage and answers ssdPagesSaved with URLs (urlMode). So a PDF from a phone ends up on
+  // the wall as pictures loaded by URL, with nothing for the station's file resolver to look for.
+  function ssdPdfPick(m, frameSel) {
+    if (_upBusy) { toast("רגע — עדיין מעלה את הקודם."); return; }
+    pickLocalFile(".pdf,application/pdf", file => {
+      if (file.size > 40 * 1024 * 1024) { toast("קובץ ה-PDF גדול מדי — עד 40MB."); return; }
+      const rd = new FileReader();
+      rd.onerror = () => toast("לא ניתן לקרוא את הקובץ.");
+      rd.onload = () => {
+        const b64 = String(rd.result || "").replace(/^data:[^,]*,/, "");
+        deliver($(frameSel), { action: "ssdFilePicked", kind: "pdf", tag: m.tag, name: file.name, pdf: b64 });
+      };
+      rd.readAsDataURL(file);
+    });
+  }
+  async function ssdPagesUpload(m, frameSel) {
+    const pages = Array.isArray(m.pages) ? m.pages : [];
+    if (!pages.length) { deliver($(frameSel), { action: "ssdPagesSaved", tag: m.tag, error: "לא התקבלו עמודים" }); return; }
+    if (_upBusy) { deliver($(frameSel), { action: "ssdPagesSaved", tag: m.tag, error: "העלאה אחרת עדיין רצה" }); return; }
+    _upBusy = true;
+    if (LAN) {
+      // The station writes the pages as pictures in the display's folder, as for a PDF picked at the station.
+      try {
+        toast("שומר " + pages.length + " עמודים בעמדה…");
+        const res = await lanCall("pages", { pages: pages });
+        deliver($(frameSel), { action: "ssdPagesSaved", tag: m.tag, paths: res.paths || [] });
+        toast(pages.length + " עמודים נשמרו.");
+      } catch (e) {
+        deliver($(frameSel), { action: "ssdPagesSaved", tag: m.tag, error: (e && e.message) || "שגיאה" });
+        toast("שמירת העמודים נכשלה: " + ((e && e.message) || "שגיאה"));
+      } finally { _upBusy = false; }
+      return;
+    }
+    try {
+      const urls = [];
+      for (let i = 0; i < pages.length; i++) {
+        toast("מעלה עמוד " + (i + 1) + " מתוך " + pages.length + "…");
+        const blob = await (await fetch(pages[i])).blob();          // the page's own data URL → bytes
+        urls.push(await ssdUploadFile(new File([blob], "page" + (i + 1) + ".jpg", { type: "image/jpeg" })));
+      }
+      deliver($(frameSel), { action: "ssdPagesSaved", tag: m.tag, paths: urls, urlMode: true });
+      toast(pages.length + " עמודים הועלו.");
+    } catch (e) {
+      deliver($(frameSel), { action: "ssdPagesSaved", tag: m.tag, error: (e && e.message) || "שגיאה" });
+      toast("העלאת העמודים נכשלה: " + ((e && e.message) || "שגיאה"));
+    } finally { _upBusy = false; }
+  }
+  // pdf.js for KLPdf — the two module files sit beside this page on the site (release.ps1 copies them from
+  // pdfjs\), fetched as text once and handed over exactly as SsdAssets.PdfJs does.
+  let _pdfLib = null;
+  async function servePdfJs(frameSel) {
+    try {
+      if (!_pdfLib) _pdfLib = await Promise.all([grab("pdf.min.mjs"), grab("pdf.worker.min.mjs")]);
+      deliver($(frameSel), { action: "pdfjs", lib: _pdfLib[0], worker: _pdfLib[1] });
+    } catch (e) { _pdfLib = null; deliver($(frameSel), { action: "pdfjs", lib: "" }); toast("מודול קריאת ה-PDF לא נטען."); }
+  }
+  // A file picked on this device, sent to the station (LAN mode). Read as a data URL and posted whole: this is a LAN.
+  function lanUpload(file, kind) {
+    return new Promise((resolve, reject) => {
+      const rd = new FileReader();
+      rd.onerror = () => reject(new Error("לא ניתן לקרוא את הקובץ."));
+      rd.onload = () => {
+        const s = String(rd.result || ""), i = s.indexOf(",");
+        lanCall("upload", { kind: kind, name: file.name || "", data: i >= 0 ? s.substring(i + 1) : "" }).then(resolve, reject);
+      };
+      rd.readAsDataURL(file);
+    });
+  }
+  async function ssdUploadFile(file) {
+    const ext = ((file.name || "").match(/\.[a-z0-9]+$/i) || [".jpg"])[0].toLowerCase();
+    const ct = file.type || "image/jpeg";
+    const r = await fetch(FUNCS + "/ssd-media", {
+      method: "POST", cache: "no-store",
+      headers: { apikey: SUPABASE_ANON_KEY, Authorization: "Bearer " + SUPABASE_ANON_KEY, "Content-Type": "application/json" },
+      body: JSON.stringify({ machine_id: MACHINE, token: TOKEN, ext: ext, contentType: ct })
+    });
+    if (r.status === 404) throw new Error("העלאת קבצים אינה מותקנת בשרת עדיין");
+    if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(/unauthorized/i.test(e.error || "") ? "הקישור אינו תקף" : "השרת דחה את ההעלאה"); }
+    const j = await r.json();                                   // { uploadUrl, publicUrl }
+    const up = await fetch(j.uploadUrl, { method: "PUT", headers: { "Content-Type": ct, "x-upsert": "true" }, body: file });
+    if (!up.ok) throw new Error("העלאת הקובץ נכשלה");
+    return j.publicUrl;
+  }
+
+  // ---- the soft lock (USER 2026-09-18) -----------------------------------------------------------------
+  // Two gabbaim, one display. Not a hard lock — a courtesy one: whoever is in holds it, refreshed by a
+  // heartbeat; a minute of silence (or closing the tab) releases it. The second gabbai to arrive is told who
+  // is inside and chooses "צפה בלבד" or "ערוך בכל זאת" (a takeover). ssd_lock does claim, heartbeat AND "who"
+  // at once: called with p_take=false it refreshes MY hold if I still have it, and otherwise reports the live
+  // holder without touching it — which is exactly how a heartbeat learns it was bumped.
+  //
+  // Everything here degrades to nothing if the lock migration was never run (the RPC 404s): the editor still
+  // opens and saves, there is just no "someone else is editing" guard. So lockRpc never throws and never blocks.
+  const WHO = EDITOR_NAME || "גבאי";
+  let VIEW_ONLY = false;      // set when the gabbai chose to look on, or was taken over mid-edit
+  let LOCK_HOLDER = "";       // the name shown in the "…is editing" messages
+  let hbTimer = null;
+  async function lockRpc(fn, body) {
+    if (LAN) return null;   // the soft lock lives on the server; over the LAN there is none to take
+    try {
+      const r = await fetch(REST + "/rpc/" + fn, {
+        method: "POST", cache: "no-store", keepalive: fn === "ssd_unlock",
+        headers: { "apikey": SUPABASE_ANON_KEY, "Authorization": "Bearer " + SUPABASE_ANON_KEY,
+                   "Content-Type": "application/json" },
+        body: JSON.stringify(body || {})
+      });
+      if (!r.ok) return null;              // 404 = migration not applied; anything else = never block on a lock hiccup
+      return await r.json();
+    } catch (e) { return null; }
+  }
+  function startHeartbeat() {
+    clearInterval(hbTimer);
+    hbTimer = setInterval(async () => {
+      if (VIEW_ONLY) return;
+      const lk = await lockRpc("ssd_lock", { p_machine_id: MACHINE, p_token: TOKEN, p_who: WHO, p_take: false });
+      if (lk && lk.mine === false) {       // someone took over while I was in
+        VIEW_ONLY = true; LOCK_HOLDER = lk.holder || "גבאי אחר"; clearInterval(hbTimer);
+        toast("⚠ " + LOCK_HOLDER + " נכנס לערוך את הצג — עברת למצב צפייה בלבד, והשמירה חסומה עד שתרעננו את הדף.");
+      }
+    }, 30000);
+  }
+  function releaseLock() {
+    if (VIEW_ONLY) return;
+    lockRpc("ssd_unlock", { p_machine_id: MACHINE, p_token: TOKEN, p_who: WHO });
+  }
+  window.addEventListener("pagehide", releaseLock);
+  window.addEventListener("beforeunload", releaseLock);
+  // Ask the second gabbai what to do. Resolves once he chooses, having set VIEW_ONLY (look on) or claimed the
+  // lock for himself (take over). Reuses the gate overlay — openEditor hides it a moment later either way.
+  function askSoftLock(holder) {
+    LOCK_HOLDER = holder || "גבאי אחר";
+    return new Promise(resolve => {
+      $("#gateCard").innerHTML =
+        '<h1>⚠ ' + LOCK_HOLDER + ' עורך כעת</h1>' +
+        '<p>הצג של בית הכנסת פתוח כרגע לעריכה אצל ' + LOCK_HOLDER + '. אם תערכו במקביל, מי שישמור אחרון ידרוס ' +
+        'את השינויים של השני.</p>' +
+        '<div style="display:flex; gap:10px; justify-content:center; flex-wrap:wrap; margin-top:14px">' +
+        '<button id="slView">צפה בלבד</button>' +
+        '<button id="slTake" class="pri">ערוך בכל זאת</button></div>';
+      $("#gate").style.display = "grid";
+      $("#slView").onclick = () => { VIEW_ONLY = true; resolve(); };
+      $("#slTake").onclick = async () => {
+        const lk = await lockRpc("ssd_lock", { p_machine_id: MACHINE, p_token: TOKEN, p_who: WHO, p_take: true });
+        VIEW_ONLY = false; if (lk && lk.holder) LOCK_HOLDER = lk.holder; resolve();
+      };
+    });
+  }
+
+  // ---- what the station's host does, done here ---------------------------------------------------------
+  // SsdEditor.ApplyData merges the page's payload key by key onto the stored settings; ZmanimEditor.ApplyData
+  // writes four DATA paths and never a switch. Both are mirrored exactly, because the preview and the layout
+  // editor must show what a SAVE would produce — not something close to it.
+  function applySsdData(base, data) {
+    const out = JSON.parse(JSON.stringify(base || {}));
+    if (data && data.ssd && typeof data.ssd === "object") {
+      out.ssd = out.ssd && typeof out.ssd === "object" ? out.ssd : {};
+      Object.keys(data.ssd).forEach(k => { out.ssd[k] = stripImageData(data.ssd[k]); });
+    }
+    const zm = data && data.zmanim;
+    if (zm && typeof zm === "object") {
+      out.plugins = out.plugins && typeof out.plugins === "object" ? out.plugins : {};
+      out.plugins.zmanim = out.plugins.zmanim && typeof out.plugins.zmanim === "object" ? out.plugins.zmanim : {};
+      ["programs", "locations", "prayers"].forEach(k => { if (zm[k] != null) out.plugins.zmanim[k] = zm[k]; });
+      if (zm.city != null) {
+        out.plugins.dailyZmanim = out.plugins.dailyZmanim && typeof out.plugins.dailyZmanim === "object" ? out.plugins.dailyZmanim : {};
+        out.plugins.dailyZmanim.city = zm.city;
+      }
+    }
+    out._fonts = { embedded: SSD_EMBEDDED_FONTS, system: [] };
+    return out;
+  }
+  // A picture's bytes never belong in settings (SsdEditor.StripData) — one photo would make them megabytes.
+  // A REMOTE file (uploaded to Storage, USER 2026-09-18) has no bytes here: its imageData/videoData is the http(s)
+  // URL the wall loads, and stripping it would throw the upload away at the very save that was meant to keep it.
+  const isUrl = v => typeof v === "string" && /^https?:\/\//i.test(v);
+  function stripImageData(v) { return JSON.parse(JSON.stringify(v, (k, x) => ((k === "imageData" || k === "videoData") && !isUrl(x)) ? undefined : x)); }
+
+  // ---- the host stub, spliced into each page ahead of its own script ------------------------------------
+  function shimFor(target) {
+    return "(function(){var h=[];window.chrome=window.chrome||{};window.chrome.webview={" +
+      "addEventListener:function(t,f){if(t==='message'&&typeof f==='function')h.push(f);}," +
+      "removeEventListener:function(t,f){h=h.filter(function(x){return x!==f;});}," +
+      "postMessage:function(j){try{window.parent.KLEdit." + target + "(JSON.parse(j));}catch(e){}}};" +
+      "window.KLDeliver=function(o){var e={data:JSON.stringify(o)};" +
+      "h.slice().forEach(function(f){try{f(e);}catch(x){}});};})();";
+  }
+  // Fetched and spliced as TEXT rather than referenced with a <script src>: these pages are written into the
+  // iframe with document.write, where `location` stays about:blank for ever — a relative URL inside them
+  // resolves against nothing and fails in silence (the same trap is written up in RemoteAdminPortal.cs).
+  async function grab(url) {
+    // Over the LAN the pages and scripts come out of the station's own program (RemoteAdminPortal).
+    if (LAN) return (await lanCall("res", { name: url })).text || "";
+    const r = await fetch(url, { cache: "no-store" });
+    if (!r.ok) throw new Error(url + " (HTTP " + r.status + ")");
+    return r.text();
+  }
+  function splice(html, boot, target) {
+    const i = html.search(/<head[^>]*>/i);
+    if (i < 0) throw new Error("הדף אינו תקין");
+    const end = html.indexOf(">", i) + 1;
+    // ssdpdf.js rides along exactly as the station injects it (FontCatalog.Script): both pages turn a PDF into page
+    // pictures through it, and its pdf.js library arrives on first use through the 'pdfjs' message (servePdfJs).
+    return html.slice(0, end) + "<scr" + "ipt>" + (boot || "") + fontsJs + "\n" + pdfModJs + "\n" + shimFor(target) + "</scr" + "ipt>" + html.slice(end);
+  }
+  function writeInto(frame, html) {
+    const d = frame.contentDocument || frame.contentWindow.document;
+    d.open(); d.write(html); d.close();
+    return frame;
+  }
+  const deliver = (frame, o) => { try { frame.contentWindow.KLDeliver(o); } catch (e) { } };
+
+  // ---- the display's own editor (admin.html in "ssdMode") ----------------------------------------------
+  // The tabs that cannot mean anything from a browser are taken off rather than left to fail on the first
+  // press: "נעילה" locks a Windows account on the display's machine, and "הפעל את הצג אוטומטית" is applied
+  // by the station's own save (SsdDisplay.SetAutoStart) and not by a settings push — so from here it would
+  // look as though it had been set, and nothing would have happened.
+  const ADM_TRIM = `
+    #ssdTabs button[data-tab="ssdLock"] { display:none !important; }
+    #ssdAutoStart, label:has(> #ssdAutoStart) { display:none !important; }
+    #aiBar { display:none !important; }
+    #ssdRemoteCard { display:none !important; }
+    #ssdCloudCard { display:none !important; }
+    .ff-card { display:none !important; }
+  `;
+  async function openEditor() {
+    if (!admHtml) admHtml = await grab("admin.html");
+    const f = $("#admFrame");
+    writeInto(f, splice(admHtml, "", "fromAdmin"));
+    // The page builds itself from these three, in this order: ssdMode swaps the kiosk's tabs for the
+    // display's, state fills them, fontList fills every font picker.
+    setTimeout(() => {
+      try {
+        const d = f.contentDocument;
+        const st = d.createElement("style"); st.textContent = ADM_TRIM; d.head.appendChild(st);
+      } catch (e) { }
+      deliver(f, { action: "ssdMode" });
+      deliver(f, { action: "state", data: S });
+      deliver(f, { action: "fontList", embedded: SSD_EMBEDDED_FONTS, system: [] });
+      // A "/layout" link opens straight onto the graphical layout editor once the tabs are built. A bare one
+      // presses the page's OWN button (the default set); a "/layout:<id>" opens that named set directly, so a
+      // synagogue's Elul layout has a link of its own. The admin page has no fixed "open editor" button to click —
+      // the buttons are built per set — so the editor is opened directly, which also works before those buttons exist.
+      if (STRAIGHT_TO_LAYOUT) {
+        // Two fixes here (USER 2026-09-18): (1) do NOT reveal the settings tabs first — open the layout editor over
+        // the gate and only then drop the gate behind it, or the tabs flash for a moment before the editor appears.
+        // (2) the layout editor follows the settings frame's THEME (which itself follows the system / console),
+        // instead of defaulting to dark — that is why a light console used to open a dark editor.
+        setTimeout(() => {
+          let th = "dark";
+          try { th = f.contentDocument.body.classList.contains("light") ? "light" : "dark"; } catch (e) { }
+          try { openScreen("edit", (S && S.ssd) || {}, null, th, LAYOUT_SET || ""); } catch (e) { }
+          // Now behind the layout overlay (z-index 200): dropping the gate no longer shows the tabs, and closing
+          // the editor reveals them as the intended fallback.
+          $("#gate").style.display = "none";
+          f.style.display = "block";
+        }, 250);
+      } else {
+        $("#gate").style.display = "none";
+        // "block", not "" — an empty inline style hands the decision back to the stylesheet, which says none:
+        // the page came up blank on its first run because of exactly that, with every check on it passing.
+        f.style.display = "block";
+      }
+    }, 120);
+  }
+
+  // ---- the layout editor / the preview (kiosk.html) -----------------------------------------------------
+  async function openScreen(mode, data, at, uiTheme, setId) {
+    if (!kioskHtml) kioskHtml = await grab("kiosk.html");
+    const payload = applySsdData(S, data);
+    if (uiTheme === "light" || uiTheme === "dark") payload._uiTheme = uiTheme;
+    // Which named layout set the editor edits (USER 2026-09-17). A "/layout:<id>" link, or the set the tab page
+    // asked for; the editor scopes everything it reads and writes to it.
+    // The ornament studio (ssd-studio.html) sits beside this page on the site; the frame is about:blank, so the
+    // address must be absolute.
+    let boot = "window.KLSsd={mode:'" + mode + "'" + (setId ? ",setId:" + JSON.stringify(String(setId)) : "") +
+               ",studioUrl:" + JSON.stringify(new URL("ssd-studio.html", location.href).href) + "};";
+    if (mode === "preview" && at) boot += "window.KLPreviewZm={date:" + JSON.stringify(String(at).slice(0, 16)) + "};";
+    $("#ovTitle").textContent = mode === "edit" ? "עורך הפריסה" : "תצוגה מקדימה";
+    $("#ovNote").textContent = mode === "edit"
+      ? "גוררים פריטים, משנים גודל ועיצוב, ולוחצים על סמל השמירה. הפריסה חוזרת למסך העריכה — ומשם שמור."
+      : (at ? "לתאריך " + String(at).slice(0, 16).replace("T", " ") : "");
+    $("#ovWrap").classList.add("open");
+    ovMode = mode;
+    const f = $("#ovFrame");
+    writeInto(f, splice(kioskHtml, boot, "fromScreen"));
+    fitOverlay();
+    setTimeout(() => deliver(f, { action: "settings", data: payload }), 120);
+  }
+  let ovMode = "edit";
+  // The layout EDITOR fills the box at natural size — it is a full editor (ribbon, side panel, stage), and
+  // kiosk.html's own ssdFit already scales the STAGE inside it. Shrinking the whole 1920×1080 frame to fit made
+  // the editor tiny (USER 2026-09-17 "זה קטן"). A PREVIEW is a wall, so it keeps its true 1920×1080 proportions,
+  // letterboxed to fit.
+  function fitOverlay() {
+    const box = $("#ovBox"), f = $("#ovFrame");
+    if (ovMode === "edit") {
+      f.style.transform = "none"; f.style.left = "0"; f.style.top = "0";
+      f.style.width = box.clientWidth + "px"; f.style.height = box.clientHeight + "px";
+      return;
+    }
+    f.style.width = SCREEN_W + "px"; f.style.height = SCREEN_H + "px";
+    const scale = Math.min(box.clientWidth / SCREEN_W, box.clientHeight / SCREEN_H);
+    f.style.transform = "scale(" + scale + ")";
+    f.style.left = Math.max(0, (box.clientWidth - SCREEN_W * scale) / 2) + "px";
+    f.style.top = Math.max(0, (box.clientHeight - SCREEN_H * scale) / 2) + "px";
+  }
+  function closeOverlay() {
+    $("#ovWrap").classList.remove("open");
+    const f = $("#ovFrame"), fresh = f.cloneNode(false);   // a written-into frame cannot be rewritten cleanly
+    f.replaceWith(fresh);
+  }
+  window.addEventListener("resize", () => { if ($("#ovWrap").classList.contains("open")) fitOverlay(); });
+  $("#ovClose").addEventListener("click", closeOverlay);
+
+  // ---- saving ------------------------------------------------------------------------------------------
+  // The browser sends the display's key and the prayer-times data, and NOTHING else. The full settings object
+  // the station will apply is assembled in the RPC, on the server: a push carrying only "ssd" would wipe
+  // every other setting the station has, because the station builds what it applies out of what it is sent
+  // (FleetCommands.MergePreserve). That is also why the gabbai's browser never holds those settings at all.
+  async function saveAll(data) {
+    const f = $("#admFrame");
+    // A gabbai who chose "צפה בלבד", or was taken over mid-edit, may look but not write over the other's work.
+    if (VIEW_ONLY) {
+      toast("צפייה בלבד — " + (LOCK_HOLDER || "גבאי אחר") + " עורך את הצג כעת. השמירה חסומה. רעננו את הדף כדי לערוך.");
+      deliver(f, { action: "ssdSaved", ok: false, message: "צפייה בלבד — מישהו אחר עורך את הצג כעת." });
+      return;
+    }
+    try {
+      const res = await rpc("ssd_push", {
+        p_machine_id: MACHINE, p_token: TOKEN,
+        p_ssd: stripImageData((data && data.ssd) || {}),
+        p_zmanim: (data && data.zmanim) || null
+      });
+      S = applySsdData(S, data);          // what the server now holds — the base for the next edit
+      META.rev = res.rev; META.applied = res.applied;
+      paintStatus();
+      deliver(f, { action: "ssdSaved", ok: true });
+      if (LAN) return;                     // saved on the station itself: it is already on the wall
+      announce();                          // a wall listening on this display redraws now, not within the minute
+      watchApplied();
+    } catch (e) {
+      deliver(f, { action: "ssdSaved", ok: false, message: e.message });
+    }
+  }
+  // Tell any web wall of this display that something changed (USER 2026-09-20). A Realtime BROADCAST — no table
+  // is read or written, so it needs nothing of RLS — sent once and forgotten: the walls poll every minute
+  // regardless, and this only shortens the wait to a second. A project without Realtime, or a filtered
+  // WebSocket, simply means the minute poll carries it as before.
+  function announce() {
+    try {
+      const url = SUPABASE_URL.replace(/^http/, "ws") + "/realtime/v1/websocket?apikey=" + encodeURIComponent(SUPABASE_ANON_KEY) + "&vsn=1.0.0";
+      const ws = new WebSocket(url), topic = "realtime:ssd." + MACHINE;
+      let ref = 0;
+      ws.onopen = () => {
+        ws.send(JSON.stringify({ topic: topic, event: "phx_join", payload: { config: { broadcast: { self: false } } }, ref: String(++ref) }));
+        setTimeout(() => {
+          try { ws.send(JSON.stringify({ topic: topic, event: "broadcast", payload: { event: "ssd", payload: { at: Date.now() } }, ref: String(++ref) })); } catch (e) { }
+          setTimeout(() => { try { ws.close(); } catch (e) { } }, 800);
+        }, 250);
+      };
+      ws.onerror = () => { try { ws.close(); } catch (e) { } };
+      setTimeout(() => { try { ws.close(); } catch (e) { } }, 6000);   // never leave one open
+    } catch (e) { }
+  }
+  function paintSync() {
+    const el = $("#hSync"); if (!META) return;
+    const synced = (META.rev || 0) === (META.applied || 0);
+    el.className = "badge " + (synced ? "b-good" : "b-warn");
+    el.textContent = synced ? "✓ הצג מעודכן" : "● נשמר — ממתין שהצג יקלוט";
+  }
+  // "הצג נראה לפני X" — how long since the station last checked in (its heartbeat / settings poll). A display that
+  // has not been seen in a while is probably off, and a "ממתין" then means "will apply when it wakes", not "stuck".
+  function relSeen(iso) {
+    if (!iso) return { text: "טרם נראה מאז החיבור", cls: "b-warn" };
+    const t = Date.parse(iso);
+    if (isNaN(t)) return { text: "", cls: "b-idle" };
+    const s = Math.max(0, Math.round((Date.now() - t) / 1000));
+    let text;
+    if (s < 75) text = "הצג נראה כעת";
+    else if (s < 3600) text = "הצג נראה לפני " + Math.round(s / 60) + " דק׳";
+    else if (s < 86400) { const h = Math.round(s / 3600); text = "הצג נראה לפני " + h + (h === 1 ? " שעה" : " שעות"); }
+    else { const d = Math.round(s / 86400); text = "הצג נראה לפני " + d + (d === 1 ? " יום" : " ימים"); }
+    // Green while fresh, amber once it looks quiet, red when clearly offline.
+    return { text: text, cls: s <= 180 ? "b-good" : s <= 1800 ? "b-warn" : "b-crit" };
+  }
+  function paintStatus() {
+    if (!META) return;
+    const seen = relSeen(META.lastSeen), se = $("#hSeen");
+    se.textContent = seen.text;
+    se.style.color = seen.cls === "b-good" ? "var(--good)" : seen.cls === "b-crit" ? "var(--crit)" : seen.cls === "b-warn" ? "var(--warn)" : "var(--ink-2)";
+    se.title = META.lastSeen ? ("נראה לאחרונה: " + String(META.lastSeen).replace("T", " ").slice(0, 19)) : "";
+    $("#hVer").textContent = META.version ? ("גרסה " + META.version) : "";
+    paintSync();
+  }
+  // ---- "הוכחת תצוגה" (USER 2026-09-20) --------------------------------------------------------------------
+  // "✓ הוחל" answers whether the settings arrived. It cannot answer whether the picture is broken, the font fell
+  // back, or the screen is simply off — and that is what a gabbai editing from his phone actually wants to know.
+  // So the display sends a small JPEG of its own screen every ten minutes (SsdDisplay.StartProofShots, marked
+  // 'auto'), and the button here shows the last one with its age. The read goes through ssd_shot_view, which
+  // takes the same view token the web wall uses — this page holds the edit token and passes it, and a project
+  // without the migration simply leaves the button hidden.
+  let SHOT = null;
+  async function loadShot() {
+    try {
+      const r = await rpc("ssd_shot_view", { p_machine_id: MACHINE, p_token: TOKEN });
+      SHOT = (r && r.jpeg_b64) ? r : null;
+    } catch (e) { SHOT = null; }
+    const b = $("#shotBtn");
+    b.style.display = SHOT ? "" : "none";
+    if (SHOT) b.title = "מה באמת על הקיר — צולם " + relSeen(SHOT.ts).text.replace("הצג נראה ", "");
+  }
+  function showShot() {
+    if (!SHOT) return;
+    $("#shotImg").src = "data:image/jpeg;base64," + SHOT.jpeg_b64;
+    const t = new Date(SHOT.ts);
+    $("#shotCap").textContent = "כך נראה הקיר ב-" + String(t.getHours()).padStart(2, "0") + ":" + String(t.getMinutes()).padStart(2, "0")
+      + " (" + (SHOT.width || "") + "×" + (SHOT.height || "") + ") · הצג שולח תמונה כל עשר דקות";
+    $("#shotOv").style.display = "flex";
+  }
+  document.getElementById("shotBtn").addEventListener("click", showShot);
+  document.getElementById("shotOv").addEventListener("click", () => { $("#shotOv").style.display = "none"; });
+  // Keep the header honest without a save: the "נראה לפני" clock ticks up locally every 20s, and every 60s a quiet
+  // ssd_fetch refreshes what the station reports (it came online, a new version, it applied the change on its own).
+  // The status checks below want four numbers, not the display: ssd_rev where the server has it (the free edition's),
+  // the full ssd_fetch where it does not.
+  let noRevRpc = false;
+  async function statusRpc() {
+    if (!noRevRpc) {
+      try { return await rpc("ssd_rev", { p_machine_id: MACHINE, p_token: TOKEN }); }
+      catch (e) { if (!/השרת אינו מוכן/.test(String(e && e.message))) throw e; noRevRpc = true; }
+    }
+    return rpc("ssd_fetch", { p_machine_id: MACHINE, p_token: TOKEN });
+  }
+  let statusPoll = 0;
+  function startStatusPoll() {
+    clearInterval(statusPoll);
+    let n = 0;
+    statusPoll = setInterval(async () => {
+      paintStatus();                                   // re-tick the relative time from the stored lastSeen
+      if (n % 15 === 0) loadShot();                    // the proof picture, about every five minutes
+      if (++n % 3 !== 0) return;                        // a network refresh once every 3rd tick (~60s)
+      try {
+        const d = await statusRpc();
+        META.rev = d.rev || 0; META.applied = d.applied || 0; META.version = d.version || META.version; META.lastSeen = d.lastSeen || META.lastSeen;
+        paintStatus();
+      } catch (e) { }
+    }, 20000);
+  }
+  // After a save, ask a few times whether the display has taken it. The station polls once a minute, so this
+  // turns "did it work?" into something the gabbai can watch instead of guess.
+  let appliedTimer = 0;
+  function watchApplied() {
+    clearInterval(appliedTimer);
+    let tries = 0;
+    appliedTimer = setInterval(async () => {
+      if (++tries > 20) { clearInterval(appliedTimer); return; }
+      try {
+        const d = await statusRpc();
+        META.applied = d.applied; META.rev = d.rev; if (d.version) META.version = d.version; if (d.lastSeen) META.lastSeen = d.lastSeen; paintStatus();
+        if ((d.rev || 0) === (d.applied || 0)) clearInterval(appliedTimer);
+      } catch (e) { clearInterval(appliedTimer); }
+    }, 15000);
+  }
+
+  // ---- what each frame asks its host for ---------------------------------------------------------------
+  // Everything that happens ON the display's machine is refused in words. The station-only list is long and
+  // every item on it is a deliberate press, so silence would read as a broken page.
+  function hostSay(what) { toast(what); }
+
+  function fromAdmin(m) {
+    const f = $("#admFrame");
+    switch (m.action) {
+      case "ready": deliver(f, { action: "ssdMode" }); deliver(f, { action: "state", data: S });
+                    deliver(f, { action: "fontList", embedded: SSD_EMBEDDED_FONTS, system: [] });
+                    deliver(f, { action: "uiTheme", theme: pageTheme() }); return;
+      case "fontList": deliver(f, { action: "fontList", embedded: SSD_EMBEDDED_FONTS, system: [] }); return;
+      case "saveSsd": saveAll(m.data); return;
+      case "ssdEdit": openScreen("edit", m.data, null, m.theme, m.setId); return;
+      case "ssdPreview": openScreen("preview", m.data, m.at); return;
+      // Answered with empty lists so nothing sits waiting for a reply that is not coming.
+      case "loadUsers": deliver(f, { action: "users", recent: [], blocked: [] }); return;
+      case "loadPrintUsers": deliver(f, { action: "printUsers", users: [] }); return;
+      case "openUrl": if (m.url) window.open(m.url, "_blank", "noopener"); return;
+      case "copyToClipboard": try { navigator.clipboard.writeText(m.text || ""); toast("הועתק"); } catch (e) { } return;
+      // A picked picture or video is uploaded from the browser to Storage (USER 2026-09-18) and comes back as a
+      // URL; a PDF is cut into pages in the page and the pages are uploaded (ssdPagesUpload).
+      case "ssdPickImage": ssdUploadPick(m, "#admFrame"); return;
+      case "ssdPickFile": if (m.kind === "pdf") ssdPdfPick(m, "#admFrame"); else ssdUploadPick(m, "#admFrame"); return;
+      case "pdfjs": servePdfJs("#admFrame"); return;
+      case "ssdSavePages": ssdPagesUpload(m, "#admFrame"); return;
+      case "ssdShowNow": hostSay("הפעלת הצג נעשית במחשב שהצג פועל עליו."); return;
+      case "ssdSheetIn": case "ssdSheetOut": hostSay("ייבוא וייצוא לאקסל נעשים במחשב שהצג פועל עליו."); return;
+      case "ssdLockAuth": case "ssdStartup": case "ssdSetExitPassword":
+        hostSay("הגדרות הנעילה נעשות במחשב שהצג פועל עליו."); return;
+    }
+    if (ADM_SILENT[m.action]) return;
+    hostSay("הפעולה הזו נעשית במחשב שהצג פועל עליו.");
+  }
+  // Chatter the page fires by itself as its tabs are drawn. A remark for each of these would bury the screen
+  // in notices about things nobody asked for.
+  const ADM_SILENT = { tabChanged:1, dropRect:1, checkExePaths:1, securityStatus:1, listPrinters:1, listUsb:1,
+                       driveStatus:1, licenseAwaitTick:1, loadCreditRequests:1, loadBlockedRuns:1,
+                       loadBlockedSites:1, rescanAccounts:1, basketFolderInfo:1,
+                       aiConfig:1, aiAsk:1, aiAttach:1, aiDropAttach:1, aiSaveConfig:1, aiModels:1, aiInstallLocal:1,
+                       webLog:1, ffState:1 };
+
+  function fromScreen(m) {
+    switch (m.action) {
+      // "שמור פריסה" — the layouts go back to the editing page, exactly as the station's window hands them
+      // over, and are saved from there with everything else.
+      case "ssdLayout":
+        deliver($("#admFrame"), { action: "ssdLayoutEdited", setId: m.setId, layouts: m.layouts });
+        closeOverlay();
+        toast("הפריסה עודכנה — לחצו שמור במסך העריכה כדי לשמור אותה.");
+        return;
+      case "ssdClose": closeOverlay(); return;
+      // The seating maps (display-wide) edited in the layout editor's map window: straight to the editing page.
+      case "ssdSeatMaps": deliver($("#admFrame"), { action: "ssdSeatMapsEdited", maps: m.maps }); return;
+      // The empty manual board's "עריכת זמני התפילות": on the station this brings the editing window forward.
+      // Here that window is the page underneath, so the overlay closes and the message routes to it.
+      case "ssdOpenZmanim":
+        closeOverlay();
+        deliver($("#admFrame"), { action: "ssdOpenZmanim" });
+        return;
+      case "ssdPickImage": ssdUploadPick(m, "#ovFrame"); return;
+      // A video is uploaded from the browser (USER 2026-09-18); a PDF becomes page pictures here and those are uploaded.
+      case "ssdPickFile": if (m.kind === "pdf") ssdPdfPick(m, "#ovFrame"); else ssdUploadPick(m, "#ovFrame"); return;
+      case "pdfjs": servePdfJs("#ovFrame"); return;
+      case "ssdSavePages": ssdPagesUpload(m, "#ovFrame"); return;
+      case "ssdAiBg": case "ssdAiKey": case "ssdAiKeyState":
+        hostSay("יצירת רקע בעזרת AI נעשית במחשב שהצג פועל עליו."); return;
+      // The ornament gallery: fetch the site's ssd-ornaments.js and hand the array to the editor.
+      case "ssdOrnaments":
+        grab("ssd-ornaments.js").then(js => {
+          let arr = []; try { const lb = js.indexOf("["), rb = js.lastIndexOf("]"); if (lb >= 0 && rb > lb) arr = JSON.parse(js.slice(lb, rb + 1)); } catch (e) { }
+          deliver($("#ovFrame"), { action: "ssdOrnamentsData", data: arr });
+        }).catch(() => deliver($("#ovFrame"), { action: "ssdOrnamentsData", data: [] }));
+        return;
+      case "openUrl": if (m.url) window.open(m.url, "_blank", "noopener"); return;
+      // Live data the station fetches for the wall. In the editor each board already shows its stand-in, so
+      // there is nothing to say and nothing to fake.
+      case "ssdWeatherReq": case "getZmanim": case "webLog":
+      case "ssdPower": case "ssdExitRequest": case "kbdSet": case "openOsk": return;
+    }
+  }
+  window.KLEdit = { fromAdmin, fromScreen };
+
+  // ---- entry -------------------------------------------------------------------------------------------
+  (async function () {
+    if (!MACHINE || !TOKEN) {
+      gateFail("הקישור אינו שלם", "העתיקו את הקישור כולו מההודעה שקיבלתם, עד סופו, ונסו שוב.");
+      return;
+    }
+    try {
+      // The fonts the program carries. Without them the editor would draw in whatever letter this computer
+      // has, and the gabbai would be choosing a look the display will not show.
+      try { fontsJs = await grab("ssd-fonts.js"); } catch (e) { fontsJs = ""; }
+      // The PDF-to-pages module (ssdpdf.js). Without it a PDF pick says "מודול קריאת ה-PDF חסר" and nothing else breaks.
+      try { pdfModJs = await grab("ssdpdf.js"); } catch (e) { pdfModJs = ""; }
+      // The families the file actually carries bytes for — read off the line the generator writes for exactly
+      // this purpose, so the pickers can never offer a name this page has no letter behind.
+      const m = /^window\.SSD_FONTS=(\[[^\n]*\]);$/m.exec(fontsJs || "");
+      if (m) { try { const list = JSON.parse(m[1]); if (Array.isArray(list) && list.length) SSD_EMBEDDED_FONTS = list; } catch (e) { } }
+      const d = await rpc("ssd_fetch", { p_machine_id: MACHINE, p_token: TOKEN });
+      META = { name: d.name || "", rev: d.rev || 0, applied: d.applied || 0, version: d.version || "", lastSeen: d.lastSeen || "" };
+      S = applySsdData({ title: d.name || "", ssd: d.ssd || {}, plugins: d.plugins || {} }, null);
+      $("#hName").textContent = META.name || "עריכת הצג";
+      $("#hSub").textContent = LAN ? "עריכת הצג · ברשת המקומית" : "עריכת הצג של בית הכנסת";
+      if (LAN) {
+        // No lock, no status poll, no proof picture: this IS the station. A quiet call every few minutes keeps the
+        // portal's session alive through a long spell in the layout editor, which makes no calls of its own.
+        $("#hSync").style.display = "none"; $("#hSeen").style.display = "none";
+        $("#hVer").textContent = META.version ? ("גרסה " + META.version) : "";
+        setInterval(() => { lanCall("ping", {}).catch(() => { }); }, 4 * 60 * 1000);
+        await openEditor();
+        return;
+      }
+      // The soft lock (USER 2026-09-18): claim the display for this gabbai. If another gabbai is already inside,
+      // ask whether to look on or take over BEFORE the editor is built. Then keep the hold warm with a heartbeat.
+      const lk = await lockRpc("ssd_lock", { p_machine_id: MACHINE, p_token: TOKEN, p_who: WHO, p_take: false });
+      if (lk && lk.mine === false) await askSoftLock(lk.holder);
+      else if (lk && lk.holder) LOCK_HOLDER = lk.holder;
+      paintStatus();
+      startStatusPoll();
+      loadShot();                                        // the display's last proof picture, if there is one
+      await openEditor();
+      if (!VIEW_ONLY) startHeartbeat();
+    } catch (e) {
+      gateFail("לא ניתן לפתוח את העריכה", (e && e.message) || "שגיאה לא ידועה.");
+    }
+  })();
+</script>
+</body>
+</html>

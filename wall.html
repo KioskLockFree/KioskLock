@@ -1,0 +1,277 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head><script>window.KL_FREE=true;</script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>צג חכם לבית כנסת</title>
+<link rel="manifest" href="wall-manifest.webmanifest">
+<meta name="theme-color" content="#0b1a2e">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="icon" href="lock-mark.png">
+<!--
+  "הצג באתר" (USER 2026-09-20): the synagogue's display as a web page. Open wall.html#<machine_id>.<view_token> in any
+  browser — a smart TV, a PC, a tablet — and the live layout is there, with no installation. The page hosts the very
+  same kiosk.html the station's window hosts (in its "show" mode), against a small stand-in for the station: it
+  fetches the display's settings from the fleet server (ssd_fetch_view, a read-only token issued in the console),
+  asks again every minute and redraws when they changed, answers the page's requests for live data (the weather,
+  a Nedarim schedule) straight from the browser, and keeps the screen awake. Shabbat / Yom Tov the page works out
+  for itself (kiosk.html: ssdHolyLocal) when it has no host.
+
+  What it cannot do: pictures picked on the station's own disk arrive as small previews (the station reports them
+  that way); a picture uploaded from the web editor is a URL and shows in full. Videos picked on the station do
+  not travel at all.
+
+  2026-09-20, three things a wall needs that a page does not:
+   • IT MUST COME UP AFTER A POWER CUT, line or no line. The files are cached by a service worker (wall-sw.js)
+     and the last settings in localStorage, so the board is on screen before the first request returns — and
+     stays on screen through an outage, with a small "לא מעודכן מאז HH:MM" once it has been out of touch for
+     a while. Nothing is ever blanked because the network is away.
+   • IT IS INSTALLED, NOT BROWSED. A manifest makes it an app on a TV or a tablet ("הוסף למסך הבית"), opening
+     full-screen at its own icon with no address bar to type into.
+   • THE LINK IS TYPED ONCE, NOT EVERY TIME. Opened with no link, the page asks for the display's 8-digit code
+     (the one its window shows) and keeps what it gets — the same code the program pairs with.
+-->
+<style>
+  html, body { height: 100%; margin: 0; background: #000; overflow: hidden; }
+  #f { position: absolute; border: 0; background: #000; transform-origin: top left; }
+  #gate { position: absolute; inset: 0; display: grid; place-items: center; color: #e8ecf6; font: 16px "Segoe UI", Arial, sans-serif; text-align: center; background: #0b1020; z-index: 5; }
+  #gate .card { background: #121a2e; border: 1px solid #263251; border-radius: 16px; padding: 26px 32px; max-width: 520px; }
+  #gate h1 { font-size: 20px; margin: 0 0 8px; }
+  #gate p { color: #a8b3cc; line-height: 1.6; margin: 6px 0; }
+  #gate button { font: inherit; cursor: pointer; background: #2f6df4; color: #fff; border: 0; border-radius: 10px; padding: 12px 26px; font-size: 18px; font-weight: 700; margin-top: 14px; }
+  #gate .spin { width: 26px; height: 26px; margin: 0 auto 12px; border: 3px solid #263251; border-top-color: #6d8cff; border-radius: 50%; animation: sp 1s linear infinite; }
+  @keyframes sp { to { transform: rotate(360deg); } }
+  /* "not updated since": small, dim, out of the way — a wall must not shout at a room because a router blinked. */
+  #stale { position: fixed; left: 10px; top: 10px; z-index: 6; background: rgba(0,0,0,.5); color: #ffd98a; border: 1px solid rgba(255,217,138,.35);
+           border-radius: 8px; padding: 5px 10px; font: 13px "Segoe UI", Arial, sans-serif; display: none; }
+  #gate .code { font: 700 34px/1.2 "Segoe UI", Arial, sans-serif; letter-spacing: 10px; text-align: center; width: 260px; padding: 10px;
+                border-radius: 10px; border: 1px solid #263251; background: #0b1020; color: #e8ecf6; margin-top: 12px; }
+  #gate .err { color: #ff9b9b; min-height: 20px; margin-top: 8px; }
+  #fs { position: fixed; left: 10px; bottom: 10px; z-index: 6; background: rgba(0,0,0,.55); color: #fff; border: 1px solid rgba(255,255,255,.35); border-radius: 8px; padding: 6px 10px; font: 13px "Segoe UI", Arial, sans-serif; cursor: pointer; opacity: 0; transition: opacity .3s; }
+  body.mouse #fs { opacity: 1; }
+  body.hide-cursor { cursor: none; }
+</style>
+</head>
+<body>
+<iframe id="f" title="הצג"></iframe>
+<div id="gate"><div class="card" id="gateCard"><div class="spin"></div><h1>טוען…</h1><p>מביא את הצג של בית הכנסת.</p></div></div>
+<div id="stale"></div>
+<button id="fs" type="button">מסך מלא</button>
+<script>
+  const SUPABASE_URL = "https://cvpvxyvjpxfmzdnykkkv.supabase.co";
+  const SUPABASE_ANON_KEY = "sb_publishable_1X7rzFvgJl0SZwNVXnp3Bg_wgIcBxxO";
+  const REST = SUPABASE_URL.replace(/\/$/, "") + "/rest/v1";
+  const SCREEN_W = 1920, SCREEN_H = 1080;
+  const $ = s => document.querySelector(s);
+  // The display this page shows: from the link (#machine.token), else from what a code paired last time. An
+  // installed app is opened at its own icon with no hash at all, which is exactly why the pairing exists.
+  const LINK_KEY = "klwall.link", DATA_KEY = "klwall.data";
+  function readLink() {
+    const hash = decodeURIComponent((location.hash || "").replace(/^#/, ""));
+    const dot = hash.indexOf(".");
+    if (dot > 0) return { machine: hash.slice(0, dot), token: hash.slice(dot + 1) };
+    try { const o = JSON.parse(localStorage.getItem(LINK_KEY) || "null"); if (o && o.machine && o.token) return o; } catch (e) { }
+    return { machine: "", token: "" };
+  }
+  let LINK = readLink();
+  let MACHINE = LINK.machine, TOKEN = LINK.token;
+  let kioskHtml = null, fontsJs = "", lastJson = "", started = false, lastAt = 0, staleTimer = null;
+
+  function gateFail(title, body) { $("#gateCard").innerHTML = "<h1>" + title + "</h1><p>" + body + "</p>"; $("#gate").style.display = "grid"; }
+  async function grab(url) { const r = await fetch(url, { cache: "no-store" }); if (!r.ok) throw new Error(url + " (HTTP " + r.status + ")"); return r.text(); }
+  async function rpc(fn, body) {
+    const r = await fetch(REST + "/rpc/" + fn, { method: "POST", cache: "no-store",
+      headers: { "apikey": SUPABASE_ANON_KEY, "Authorization": "Bearer " + SUPABASE_ANON_KEY, "Content-Type": "application/json" }, body: JSON.stringify(body || {}) });
+    if (!r.ok) {
+      const e = await r.json().catch(() => ({})); const msg = String(e.message || e.hint || ("HTTP " + r.status));
+      if (/unauthorized/i.test(msg)) throw new Error("הקישור אינו תקף (בוטל, או שגוי).");
+      if (r.status === 404) throw new Error("השרת אינו מוכן להצגה באתר (חסרה ההתקנה: fleet/migrate-ssd-wall.sql).");
+      throw new Error(msg);
+    }
+    return r.json();
+  }
+  // ---- the stand-in for the station: what kiosk.html posts, answered from the browser ----------------------------
+  function shim() {
+    return "(function(){var h=[];window.chrome=window.chrome||{};window.chrome.webview={" +
+      "addEventListener:function(t,f){if(t==='message'&&typeof f==='function')h.push(f);}," +
+      "removeEventListener:function(t,f){h=h.filter(function(x){return x!==f;});}," +
+      "postMessage:function(j){try{window.parent.KLWall(JSON.parse(j));}catch(e){}}};" +
+      "window.KLDeliver=function(o){var e={data:JSON.stringify(o)};h.slice().forEach(function(f){try{f(e);}catch(x){}});};})();";
+  }
+  const deliver = o => { try { $("#f").contentWindow.KLDeliver(o); } catch (e) { } };
+  const wx = { key: "", timer: null };
+  window.KLWall = function (m) {
+    switch (m.action) {
+      // the weather: the same service and the same shape the station answers with
+      case "ssdWeatherReq": {
+        const key = m.lat + "," + m.lon;
+        const go = async () => {
+          try {
+            const u = "https://api.open-meteo.com/v1/forecast?latitude=" + (+m.lat).toFixed(4) + "&longitude=" + (+m.lon).toFixed(4) +
+              "&current=temperature_2m,weather_code&daily=weather_code,temperature_2m_max,temperature_2m_min&forecast_days=4&timezone=" + encodeURIComponent(m.tz || "Asia/Jerusalem");
+            const r = await fetch(u); const j = await r.json();
+            const days = ((j.daily || {}).time || []).map((d, i) => ({ date: d, max: (j.daily.temperature_2m_max || [])[i], min: (j.daily.temperature_2m_min || [])[i], code: (j.daily.weather_code || [])[i] }));
+            deliver({ action: "ssdWeather", ok: true, temp: (j.current || {}).temperature_2m, code: (j.current || {}).weather_code, days: days, at: Date.now() });
+          } catch (e) { deliver({ action: "ssdWeather", ok: false }); }
+        };
+        if (wx.key !== key) { wx.key = key; clearInterval(wx.timer); wx.timer = setInterval(go, 30 * 60 * 1000); }
+        go(); return;
+      }
+      // a Nedarim Plus schedule, from the same endpoint the station reads
+      case "getZmanim": {
+        const mosad = String(m.mosad || "").trim(); if (!mosad) return;
+        fetch("https://www.matara.pro/nedarimplus/Zmanim/Manage.aspx?Action=GetMosadMinyan&MosadId=" + encodeURIComponent(mosad))
+          .then(r => r.json()).then(data => deliver({ action: "zmanim", ok: true, mosad: mosad, data: data }))
+          .catch(e => deliver({ action: "zmanim", ok: false, mosad: mosad, message: String(e && e.message || e) }));
+        return;
+      }
+      // nothing to do with a browser: power, exit, the on-screen keyboard, the log
+      default: return;
+    }
+  };
+  // ---- the page, and its settings every minute ------------------------------------------------------------------
+  function fit() {
+    const f = $("#f"), k = Math.min(innerWidth / SCREEN_W, innerHeight / SCREEN_H);
+    f.style.width = SCREEN_W + "px"; f.style.height = SCREEN_H + "px";
+    f.style.transform = "scale(" + k + ")";
+    f.style.left = Math.max(0, (innerWidth - SCREEN_W * k) / 2) + "px"; f.style.top = Math.max(0, (innerHeight - SCREEN_H * k) / 2) + "px";
+  }
+  function payload(d) { return { title: d.name || "", ssd: d.ssd || {}, plugins: d.plugins || {}, shabbat: d.shabbat || {}, _fonts: { embedded: fontsEmbedded(), system: [] } }; }
+  // The last settings that arrived, kept so the next start has a board to draw before the first request returns
+  // — and through an outage that outlives the page. Keyed by display, so a paired-then-repaired screen never
+  // shows the previous synagogue's board. A quota failure is nothing: the page simply has no cache this time.
+  function cacheSave(d) { try { localStorage.setItem(DATA_KEY, JSON.stringify({ machine: MACHINE, at: Date.now(), d: d })); } catch (e) { } }
+  function cacheLoad() {
+    try { const o = JSON.parse(localStorage.getItem(DATA_KEY) || "null"); return (o && o.machine === MACHINE && o.d) ? o : null; } catch (e) { return null; }
+  }
+  // How old what is on screen is. Silent for the first ten minutes (a poll may simply have been missed), then
+  // a quiet line in the corner. It is never an excuse to blank the board.
+  function staleTick() {
+    const el = $("#stale");
+    if (!lastAt) { el.style.display = "none"; return; }
+    const mins = Math.floor((Date.now() - lastAt) / 60000);
+    if (mins < 10) { el.style.display = "none"; return; }
+    const d = new Date(lastAt);
+    el.textContent = "לא מעודכן מאז " + String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0")
+      + (mins >= 120 ? " (" + Math.floor(mins / 60) + " שעות)" : " (" + mins + " דק׳)");
+    el.style.display = "";
+  }
+  function fontsEmbedded() { const m = /^window\.SSD_FONTS=(\[[^\n]*\]);$/m.exec(fontsJs || ""); try { return m ? JSON.parse(m[1]) : []; } catch (e) { return []; } }
+  // A server that has ssd_rev (the free edition's, fleet-free\schema.sql) is asked first whether anything changed —
+  // a few bytes a minute instead of the whole display, which on a shared free plan is the difference between a
+  // few walls and hundreds. A server without it (404) is simply read in full every minute, as before.
+  let revSig = "", noRev = false;
+  async function pull(first) {
+    if (!first && !noRev) {
+      try {
+        const v = await rpc("ssd_rev", { p_machine_id: MACHINE, p_token: TOKEN });
+        const sig = (v && (v.rev + "|" + v.seen)) || "";
+        if (sig && sig === revSig) { lastAt = Date.now(); staleTick(); return; }
+        revSig = sig;
+      } catch (e) { if (/HTTP 404|השרת אינו מוכן/.test(String(e && e.message))) noRev = true; else throw e; }
+    }
+    const d = await rpc("ssd_fetch_view", { p_machine_id: MACHINE, p_token: TOKEN });
+    lastAt = Date.now(); staleTick(); cacheSave(d);
+    const j = JSON.stringify([d.ssd, d.plugins, d.shabbat, d.name]);
+    if (!first && j === lastJson) return;
+    lastJson = j;
+    if (first) boot(d); else deliver({ action: "settings", data: payload(d) });
+  }
+  // Write the kiosk page into the frame and hand it its settings. Called once — from the cache when there is
+  // one (so the wall is up before the network answers) and otherwise from the first successful pull.
+  function boot(d) {
+    const html = kioskHtml, i = html.search(/<head[^>]*>/i), end = html.indexOf(">", i) + 1;
+    const head = "window.KLSsd={mode:'show',web:true};";
+    const doc = html.slice(0, end) + "<scr" + "ipt>" + head + fontsJs + "\n" + shim() + "</scr" + "ipt>" + html.slice(end);
+    const f = $("#f"), w = f.contentWindow.document; w.open(); w.write(doc); w.close();
+    fit();
+    setTimeout(() => deliver({ action: "settings", data: payload(d) }), 150);
+  }
+  // ---- full screen + a screen that stays awake ---------------------------------------------------------------------
+  async function goFull() {
+    try { if (!document.fullscreenElement) await document.documentElement.requestFullscreen({ navigationUI: "hide" }); } catch (e) { }
+    try { if (navigator.wakeLock) { const lock = await navigator.wakeLock.request("screen"); document.addEventListener("visibilitychange", async () => { if (document.visibilityState === "visible") { try { await navigator.wakeLock.request("screen"); } catch (e) { } } }); } } catch (e) { }
+  }
+  $("#fs").addEventListener("click", goFull);
+  let cursorTimer = null;
+  document.addEventListener("mousemove", () => { document.body.classList.add("mouse"); document.body.classList.remove("hide-cursor"); clearTimeout(cursorTimer); cursorTimer = setTimeout(() => { document.body.classList.remove("mouse"); document.body.classList.add("hide-cursor"); }, 3000); });
+  window.addEventListener("resize", fit);
+  // ---- go ------------------------------------------------------------------------------------------------------------
+  // Opened with no link: ask for the display's 8-digit code — the one its own window shows — and trade it for a
+  // read-only token (ssd_pair_view). Kept afterwards, so the app opens straight onto the board from then on.
+  function askCode() {
+    $("#gateCard").innerHTML = '<h1>חיבור לצג</h1><p>הקלידו את הקוד בן 8 הספרות שמופיע בחלון הצג של בית הכנסת.</p>'
+      + '<input class="code" id="pcode" inputmode="numeric" maxlength="8" autocomplete="off" placeholder="────────">'
+      + '<div class="err" id="perr"></div><button type="button" id="pgo">חבר</button>';
+    $("#gate").style.display = "grid";
+    const go = async () => {
+      const code = ($("#pcode").value || "").replace(/\D/g, "");
+      if (code.length !== 8) { $("#perr").textContent = "הקוד בן 8 ספרות."; return; }
+      $("#perr").textContent = "מחבר…";
+      try {
+        const r = await rpc("ssd_pair_view", { p_code: code });
+        MACHINE = r.machine_id; TOKEN = r.token;
+        try { localStorage.setItem(LINK_KEY, JSON.stringify({ machine: MACHINE, token: TOKEN })); } catch (e) { }
+        start();
+      } catch (e) { $("#perr").textContent = (e && e.message) || "הקוד לא התקבל."; }
+    };
+    $("#pgo").addEventListener("click", go);
+    $("#pcode").addEventListener("keydown", e => { if (e.key === "Enter") go(); });
+    $("#pcode").focus();
+  }
+  async function start() {
+    try {
+      try { fontsJs = await grab("ssd-fonts.js"); } catch (e) { fontsJs = ""; }
+      kioskHtml = await grab("kiosk.html");
+      // A cached board goes up at once — before the first request, and even with no line at all.
+      const cached = cacheLoad();
+      if (cached) { lastAt = cached.at; lastJson = JSON.stringify([cached.d.ssd, cached.d.plugins, cached.d.shabbat, cached.d.name]); boot(cached.d); staleTick(); }
+      try { await pull(!cached); }
+      catch (e) { if (!cached) throw e; }
+      // A first press anywhere puts the page in full screen (browsers allow it only on a gesture): the gate says so
+      // and goes away on the press; on a TV browser with no pointer the page simply shows as it is.
+      $("#gateCard").innerHTML = "<h1>הצג מוכן</h1><p>לחצו במקום כלשהו למסך מלא.</p><button type=\"button\" id=\"go\">הצג במסך מלא</button>";
+      const start = () => { if (started) return; started = true; $("#gate").style.display = "none"; goFull(); };
+      $("#go").addEventListener("click", start);
+      $("#gate").addEventListener("click", start);
+      setTimeout(() => { if (!started) { started = true; $("#gate").style.display = "none"; } }, 8000);   // no hand around: just show it
+      setInterval(() => pull(false).catch(e => { }), 60 * 1000);
+      staleTimer = setInterval(staleTick, 60 * 1000);
+      // The push channel holds a socket open per wall; the free edition's plan allows only so many at once, so
+      // there the minute's rev check is the channel (window.KL_FREE, set by the free site).
+      if (!window.KL_FREE) live();
+    } catch (e) { gateFail("לא ניתן להציג את הצג", (e && e.message) || "שגיאה לא ידועה."); }
+  }
+  // A push channel beside the poll (USER 2026-09-20): the editor announces a save on a channel named by the
+  // display, and a wall listening on it redraws in a second instead of within the minute. Broadcast only — the
+  // page is anonymous and has no business reading the table — and entirely optional: the minute poll above is
+  // still the thing that guarantees the board, so a project without Realtime, a blocked WebSocket or a filter
+  // in the way all end in exactly the behaviour of yesterday.
+  function live() {
+    try {
+      const url = SUPABASE_URL.replace(/^http/, "ws") + "/realtime/v1/websocket?apikey=" + encodeURIComponent(SUPABASE_ANON_KEY) + "&vsn=1.0.0";
+      let ws = null, ref = 0, hb = null;
+      const open = () => {
+        ws = new WebSocket(url);
+        const topic = "realtime:ssd." + MACHINE;
+        ws.onopen = () => {
+          ws.send(JSON.stringify({ topic: topic, event: "phx_join", payload: { config: { broadcast: { self: false } } }, ref: String(++ref) }));
+          hb = setInterval(() => { try { ws.send(JSON.stringify({ topic: "phoenix", event: "heartbeat", payload: {}, ref: String(++ref) })); } catch (e) { } }, 25000);
+        };
+        ws.onmessage = ev => {
+          try { const m = JSON.parse(ev.data); if (m.event === "broadcast") pull(false).catch(() => { }); } catch (e) { }
+        };
+        const bye = () => { clearInterval(hb); hb = null; ws = null; setTimeout(open, 30000); };
+        ws.onclose = bye; ws.onerror = () => { try { ws.close(); } catch (e) { } };
+      };
+      open();
+    } catch (e) { }
+  }
+  (async function () {
+    if ("serviceWorker" in navigator) { try { navigator.serviceWorker.register("wall-sw.js"); } catch (e) { } }
+    if (!MACHINE || !TOKEN) { askCode(); return; }
+    start();
+  })();
+</script>
+</body>
+</html>

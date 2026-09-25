@@ -1,0 +1,1944 @@
+<!DOCTYPE html>
+<!--
+  עיטורן — סטודיו וקטורי לציור עיטורים.
+  (https://eitoran.vercel.app). העותק הזה חי בתוך KioskLock ("מחולל עיטורים" בעורך הצג החכם): שלושה שינויים
+  בלבד — אין קישור לדף הבית של האתר, אין הזרקות של מסנן, ו"ייצא וקטור (SVG)" מוסר את הציור לעורך שמארח את הדף
+  (postMessage) במקום להוריד קובץ. כל השאר כפי שנכתב.
+-->
+
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>עיטורן - סטודיו וקטורי פרו (משולב צבע אישי מתקדם)</title>
+    <link rel="icon" href="icon.png" type="image/x-icon">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root { --bg-color: #121212; --panel-bg: #1e1e1e; --gold: #d4af37; --gold-hover: #f1c40f; --text-light: #e0e0e0; --border-color: #333; --danger: #e74c3c; --select: #3498db; --success: #2ecc71; --purple: #9b59b6; }
+        body { margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: var(--bg-color); color: var(--text-light); display: flex; height: 100vh; overflow: hidden; user-select: none; transition: background-color 0.3s, color 0.3s; }
+        
+        #sidebar, #advanced-sidebar { width: 350px; background-color: var(--panel-bg); border-left: 1px solid var(--border-color); padding: 15px 20px; box-shadow: -2px 0 10px rgba(0,0,0,0.5); display: flex; flex-direction: column; gap: 10px; overflow-y: auto; z-index: 10; transition: background-color 0.3s, transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+        #advanced-sidebar { display: none; }
+
+        h1 { color: var(--gold); text-align: center; margin-top: 0; font-size: 24px; padding-bottom: 5px; margin-bottom: 0; }
+        .credit { text-align: center; font-size: 11px; color: #888; margin-bottom: 10px; border-bottom: 1px solid var(--border-color); padding-bottom: 10px; line-height: 1.5; }
+        .credit a { color: var(--gold); text-decoration: none; }
+        
+        #back-to-home { position: absolute; top: 20px; right: 20px; z-index: 1000; background-color: var(--panel-bg); color: var(--gold); padding: 10px 15px; border-radius: 8px; text-decoration: none; font-weight: bold; font-size: 14px; border: 1px solid var(--border-color); box-shadow: 0 4px 10px rgba(0,0,0,0.5); transition: 0.2s; display: flex; align-items: center; gap: 8px; }
+        #back-to-home:hover { background-color: var(--gold); color: #000; border-color: var(--gold); }
+
+        .tabs-container { display: flex; border-bottom: 1px solid var(--border-color); margin-bottom: 5px; }
+        .tab-btn { flex: 1; background: transparent; color: #888; border: none; padding: 10px 0; font-weight: bold; cursor: pointer; border-bottom: 2px solid transparent; transition: 0.2s; font-size: 13px; outline: none; }
+        .tab-btn:hover { color: var(--text-light); }
+        .tab-btn.active { color: var(--gold); border-bottom-color: var(--gold); }
+        .tab-panel { display: flex; flex-direction: column; gap: 10px; }
+        
+        .control-group { display: flex; flex-direction: column; gap: 4px; }
+        
+        label { font-size: 12px; color: var(--gold); font-weight: bold; }
+        input[type="range"] { width: 100%; accent-color: var(--gold); }
+        select, input[type="color"], input[type="number"], input[type="file"] { width: 100%; padding: 6px; background-color: #2a2a2a; border: 1px solid var(--border-color); color: white; border-radius: 4px; outline: none; box-sizing: border-box; font-size: 13px; transition: 0.3s;}
+        
+        .btn-group { display: flex; gap: 8px; flex-wrap: wrap; }
+        .btn { background-color: #333; color: white; border: 1px solid #555; padding: 7px; font-weight: bold; cursor: pointer; border-radius: 4px; transition: 0.2s; flex: 1; text-align: center; font-size: 12px; white-space: nowrap;}
+        .btn:hover { background-color: #444; }
+        .btn.primary { background-color: var(--gold); color: #000; border: none; font-size: 13px;}
+        .btn.primary:hover { background-color: var(--gold-hover); }
+        .btn.vector { background-color: var(--purple); border: none; color: white; font-size: 13px;}
+        .btn.vector:hover { background-color: #8e44ad; }
+        .btn.danger { background-color: var(--danger); border-color: #c0392b; }
+        .btn.active { background-color: var(--select); border-color: #2980b9; color: white;}
+        .btn.action { background-color: #2c3e50; border-color: #34495e; }
+        .btn.success { background-color: #27ae60; border-color: #2ecc71; }
+        .btn.success:hover { background-color: #2ecc71; }
+        .btn.drive { background-color: #4285F4; border-color: #357ae8; width: 100%; margin-top: 5px; font-size: 13px;}
+        .btn.drive:hover { background-color: #357ae8; }
+        .btn.gallery { background-color: #8e44ad; color: white; width: 100%; margin-top: 5px; font-size: 13px; text-decoration: none; display: flex; align-items: center; justify-content: center;}
+        .btn.gallery:hover { background-color: #9b59b6; }
+        
+        #canvas-container { flex-grow: 1; position: relative; background-color: transparent; overflow: hidden; touch-action: none; transition: height 0.3s;} 
+        #canvas-bg { position: absolute; top:0; left:0; width:100%; height:100%; z-index: -1; background-image: linear-gradient(45deg, #1a1a1a 25%, transparent 25%), linear-gradient(-45deg, #1a1a1a 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #1a1a1a 75%), linear-gradient(-45deg, transparent 75%, #1a1a1a 75%); background-size: 20px 20px; background-position: 0 0, 0 10px, 10px -10px, -10px 0px; background-color: #222; transition: 0.3s;}
+        
+        canvas { display: block; width: 100%; height: 100%; position: absolute; top:0; left:0; }
+        #drawing-canvas { z-index: 1; }
+        #temp-canvas { z-index: 2; pointer-events: none; }
+        
+        #custom-cursor { position: absolute; border: 1.5px solid rgba(212, 175, 55, 0.8); border-radius: 50%; pointer-events: none; transform: translate(-50%, -50%); z-index: 100; transition: width 0.05s, height 0.05s; }
+        
+        .section-title { background-color: #333; padding: 4px; text-align: center; font-size: 12px; border-radius: 4px; margin-top: 5px; box-shadow: inset 0 1px 3px rgba(0,0,0,0.3); transition: 0.3s;}
+        
+        #camera-toolbar { position: absolute; bottom: 20px; right: 20px; background-color: rgba(30,30,30,0.9); border: 1px solid var(--border-color); border-radius: 8px; padding: 10px; display: flex; gap: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.5); z-index: 20; transition: 0.3s;}
+        .cam-btn { background-color: #444; color: white; border: none; border-radius: 4px; width: 35px; height: 35px; font-size: 16px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: 0.2s;}
+        .cam-btn:hover, .cam-btn.active { background-color: var(--gold); color: black;}
+        #cam-info { display: flex; align-items: center; justify-content: center; font-size: 12px; color: var(--gold); width: 50px; font-weight: bold;}
+        
+        #gradient-colors, #adv-fill-gradient-colors { display: flex; flex-direction: column; gap: 5px; }
+        .grad-color-row { display: flex; gap: 5px; align-items: center; }
+        .remove-color { cursor: pointer; color: var(--danger); font-weight: bold; padding: 0 5px; }
+
+        #btn-layers-toggle { position: absolute; left: 20px; top: 20px; z-index: 100; background: #333; color: var(--gold); border: 1px solid var(--border-color); padding: 8px 12px; border-radius: 5px; cursor: pointer; font-weight: bold; box-shadow: 0 4px 15px rgba(0,0,0,0.5); transition: 0.2s; }
+        #btn-layers-toggle:hover { background: #444; }
+        #layers-panel-container { display: none; position: absolute; left: 20px; top: 60px; z-index: 100; background: rgba(30,30,30,0.95); border: 1px solid var(--border-color); border-radius: 5px; width: 180px; max-height: 60vh; overflow-y: auto; padding: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.5); backdrop-filter: blur(5px); transition: 0.3s;}
+        .layer-item { display: flex; align-items: center; padding: 8px; margin-bottom: 4px; background: #2a2a2a; border: 1px solid #444; border-radius: 4px; cursor: pointer; color: #ccc; font-size: 12px; transition: 0.2s; justify-content: space-between;}
+        .layer-item:hover { background: #333; }
+        .layer-item.selected { border-color: var(--gold); background: rgba(212, 175, 55, 0.2); color: white; }
+        .layer-drag-indicator { color: #666; font-size: 14px; cursor: grab; }
+
+        .shape-btn { background: #2a2a2a; border: 1px solid #444; color: white; padding: 12px 5px; border-radius: 6px; cursor: pointer; text-align: center; transition: 0.2s; display: flex; flex-direction: column; align-items: center; gap: 5px; font-size: 11px; }
+        .shape-btn i { font-size: 20px; color: var(--gold); }
+        .shape-btn:hover { background: #333; border-color: var(--gold); }
+        
+        .color-inputs-row { display: flex; gap: 5px; width: 100%; }
+        .color-inputs-row input[type="color"] { flex: 1; }
+
+        /* --- כפתור קיפול הכלים במסכי מגע --- */
+        #mobile-toggle-btn {
+            display: none; position: absolute; z-index: 1001; bottom: 45vh; left: 50%; transform: translateX(-50%);
+            background: var(--panel-bg); color: var(--gold); border: 1px solid var(--border-color);
+            border-radius: 50% 50% 0 0; width: 60px; height: 35px; font-size: 20px; text-align: center; cursor: pointer;
+            box-shadow: 0 -4px 10px rgba(0,0,0,0.4); transition: 0.3s;
+        }
+
+        /* --- עיצוב מצב יום (Light Theme) --- */
+        body.light-theme {
+            --bg-color: #f5f5f5;
+            --panel-bg: #ffffff;
+            --text-light: #333333;
+            --border-color: #dddddd;
+        }
+        body.light-theme select, 
+        body.light-theme input[type="color"], 
+        body.light-theme input[type="number"], 
+        body.light-theme input[type="file"] { background-color: #f0f0f0; color: #000; border: 1px solid #ccc; }
+        body.light-theme .btn { background-color: #e0e0e0; color: #333; border-color: #ccc; }
+        body.light-theme .btn:hover { background-color: #d0d0d0; }
+        body.light-theme .btn.active { background-color: #3498db; color: #fff; border-color: #2980b9;}
+        body.light-theme .btn.primary { background-color: var(--gold); color: #000; border: none;}
+        body.light-theme .btn.danger { background-color: var(--danger); color: white; border-color: #c0392b;}
+        body.light-theme .btn.vector { background-color: var(--purple); color: white;}
+        body.light-theme .btn.action { background-color: #bdc3c7; border-color: #95a5a6; color: #2c3e50;}
+        body.light-theme .btn.success { background-color: #2ecc71; border-color: #27ae60; color: white;}
+        body.light-theme .section-title { background-color: #e8e8e8; color: #333; box-shadow: none; border: 1px solid #ccc; }
+        body.light-theme .layer-item, body.light-theme .shape-btn { background: #fafafa; border-color: #ccc; color: #333; }
+        body.light-theme .layer-item:hover, body.light-theme .shape-btn:hover { background: #eee; }
+        body.light-theme .layer-item.selected { border-color: var(--gold); background: rgba(212, 175, 55, 0.2); color: #000; }
+        body.light-theme #canvas-bg {
+            background-color: #ffffff;
+            background-image: linear-gradient(45deg, #f0f0f0 25%, transparent 25%), linear-gradient(-45deg, #f0f0f0 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #f0f0f0 75%), linear-gradient(-45deg, transparent 75%, #f0f0f0 75%);
+        }
+        body.light-theme #camera-toolbar { background-color: rgba(255,255,255,0.9); }
+        body.light-theme .cam-btn { background-color: #eee; color: #333; border: 1px solid #ccc; }
+        body.light-theme .cam-btn:hover, body.light-theme .cam-btn.active { background-color: var(--gold); color: #000; }
+        body.light-theme #btn-layers-toggle { background: #fff; color: var(--gold); border-color: #ccc;}
+        body.light-theme #btn-layers-toggle:hover { background: #eee; }
+        body.light-theme #back-to-home { background: #fff; color: var(--gold); border-color: #ccc;}
+        body.light-theme #back-to-home:hover { background: var(--gold); color: #000;}
+        body.light-theme #layers-panel-container { background: rgba(255, 255, 255, 0.95); border-color: #ccc;}
+        body.light-theme #mobile-toggle-btn { background: #fff; border-color: #ccc; box-shadow: 0 -4px 10px rgba(0,0,0,0.15);}
+
+        /* --- התאמה למסכי מובייל וטאבלט --- */
+        @media (max-width: 768px) {
+            body { flex-direction: column; }
+            #canvas-container { height: 55vh; flex-grow: 0; width: 100%; }
+            #sidebar, #advanced-sidebar { width: 100%; flex-grow: 1; height: 45vh; border-left: none; border-top: 2px solid var(--border-color); padding: 10px; box-sizing: border-box; }
+            #camera-toolbar { bottom: 10px; right: 10px; gap: 4px; padding: 5px; flex-wrap: wrap; justify-content: flex-end; max-width: 95%;}
+            .cam-btn { width: 32px; height: 32px; font-size: 14px; }
+            #cam-info { width: 35px; font-size: 11px; }
+            #btn-advanced-edit { font-size: 11px; padding: 0 5px; margin-right: 5px; }
+            #btn-layers-toggle { top: 10px; left: 10px; padding: 6px 10px; font-size: 12px; }
+            #back-to-home { top: 10px; right: 10px; padding: 6px 10px; font-size: 12px; }
+            #layers-panel-container { top: 45px; width: 150px; }
+            
+            #mobile-toggle-btn { display: flex; align-items: center; justify-content: center; }
+            
+            /* עיצוב המצב המקופל */
+            body.sidebar-collapsed #sidebar, body.sidebar-collapsed #advanced-sidebar { transform: translateY(100%); height: 0; padding: 0; border: none; overflow: hidden; position: absolute;}
+            body.sidebar-collapsed #canvas-container { height: 100vh; }
+            body.sidebar-collapsed #mobile-toggle-btn { bottom: 20px; border-radius: 50%; height: 60px; box-shadow: 0 4px 15px rgba(0,0,0,0.6); }
+            body.sidebar-collapsed #mobile-toggle-btn i { transform: rotate(180deg); transition: 0.3s;}
+        }
+    </style>
+
+    <!-- KioskLock skin: the studio in the smart-display editor's own colours, and light / dark as the editor is
+         (USER 2026-09-20). The editor tells the frame which (postMessage {klTheme}); ?theme= does the same at load. -->
+    <style id="kl-skin">
+        :root { --bg-color: #0b1020; --panel-bg: #121a2e; --gold: #2f6df4; --gold-hover: #4b82ff; --text-light: #e8ecf6; --border-color: #263251; --select: #7aa0ff; }
+        body { font-family: "Segoe UI", Arial, sans-serif; }
+        .btn { background-color: #27304d; border-color: #2f3b63; border-radius: 7px; color: #cdd6ef; }
+        .btn:hover { background-color: #3b4f86; }
+        .btn.primary, .btn.primary:hover { color: #fff; }
+        .btn.active { background-color: #2f6df4; border-color: #2f6df4; }
+        .tab-btn.active { color: #7aa0ff; border-bottom-color: #2f6df4; }
+        select, input[type="number"], input[type="text"], input[type="file"] { background-color: #0e1426; color: #e8ecf6; border: 1px solid #2f3b63; border-radius: 6px; }
+        #canvas-bg { background-image: linear-gradient(45deg, #141c33 25%, transparent 25%), linear-gradient(-45deg, #141c33 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #141c33 75%), linear-gradient(-45deg, transparent 75%, #141c33 75%); background-color: #0e1426; }
+        body.light-theme { --bg-color: #eef2fa; --panel-bg: #ffffff; --text-light: #15203a; --border-color: #d6dcea; }
+        body.light-theme .btn { background-color: #d6deef; color: #26304d; border-color: #ccd4e6; }
+        body.light-theme .btn:hover { background-color: #c9d8f7; }
+        body.light-theme .btn.primary { background-color: var(--gold); color: #fff; }
+        body.light-theme .btn.active { background-color: #2f6df4; color: #fff; border-color: #2f6df4; }
+        body.light-theme select, body.light-theme input[type="color"], body.light-theme input[type="number"], body.light-theme input[type="text"], body.light-theme input[type="file"] { background-color: #fff; color: #15203a; border: 1px solid #ccd4e6; }
+        body.light-theme #canvas-bg { background-image: linear-gradient(45deg, #e3e8f3 25%, transparent 25%), linear-gradient(-45deg, #e3e8f3 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #e3e8f3 75%), linear-gradient(-45deg, transparent 75%, #e3e8f3 75%); background-color: #f4f6fb; }
+        .credit a { color: #7aa0ff; }
+    </style>
+</head>
+<body>
+    <!-- KioskLock: the theme is set the moment the body exists (from ?theme= or the editor's message), not only
+         after the page finished loading — so the studio never flashes dark in a light editor. -->
+    <script>
+        (function () {
+            var apply = function (light) { document.body.classList.toggle('light-theme', !!light); var i = document.querySelector('#btn-theme-toggle i'); if (i) i.className = light ? 'fas fa-moon' : 'fas fa-sun'; };
+            window.__klTheme = apply;
+            if (/[?&]theme=light/.test(location.search)) apply(true);
+            window.addEventListener('message', function (e) { var d = e && e.data; if (d && d.klTheme) apply(d.klTheme === 'light'); });
+        })();
+    </script>
+
+    
+
+    <button id="btn-layers-toggle"><i class="fas fa-layer-group"></i> שכבות</button>
+    <div id="layers-panel-container">
+        <div style="font-size:12px; color:var(--gold); text-align:center; margin-bottom:10px; border-bottom:1px solid #555; padding-bottom:5px;">לחץ לבחירה, גרור לשינוי סדר</div>
+        <div id="layers-list"></div>
+    </div>
+    
+    <button id="mobile-toggle-btn" title="הסתר/הצג פאנל כלים"><i class="fas fa-chevron-down"></i></button>
+
+    <div id="canvas-container">
+        <div id="canvas-bg"></div>
+        <canvas id="drawing-canvas"></canvas>
+        <canvas id="temp-canvas"></canvas>
+        <div id="custom-cursor"></div>
+        
+        <div id="camera-toolbar">
+            <button class="cam-btn" id="btn-zoom-in" title="התקרב"><i class="fas fa-search-plus"></i></button>
+            <button class="cam-btn" id="btn-zoom-out" title="התרחק"><i class="fas fa-search-minus"></i></button>
+            <button class="cam-btn" id="btn-rotate-ccw" title="סובב שמאלה"><i class="fas fa-undo-alt"></i></button>
+            <button class="cam-btn" id="btn-rotate-cw" title="סובב ימינה"><i class="fas fa-redo-alt"></i></button>
+            <button class="cam-btn" id="btn-reset-cam" title="אפס תצוגה"><i class="fas fa-home"></i></button>
+            <button class="cam-btn" id="btn-theme-toggle" title="החלף מצב יום/לילה"><i class="fas fa-sun"></i></button>
+            <button class="cam-btn" id="btn-pan" title="הזז מסך (או החזק רווח)"><i class="fas fa-hand-paper"></i></button>
+            <div id="cam-info">100%</div>
+            <button class="cam-btn" id="btn-advanced-edit" title="עריכה מתקדמת" style="width: auto; padding: 0 10px; font-size: 13px; font-weight: bold; margin-right: 10px; background-color: var(--purple);"><i class="fas fa-magic"></i> עריכה מתקדמת</button>
+        </div>
+    </div>
+
+    <div id="sidebar">
+        <h1>עיטורן</h1>
+        <div class="tabs-container">
+            <button class="tab-btn active" id="tab-btn-draw" onclick="switchTab('draw')"><i class="fas fa-pen"></i> צייר</button>
+            <button class="tab-btn" id="tab-btn-edit" onclick="switchTab('edit')"><i class="fas fa-mouse-pointer"></i> בחר/ערוך</button>
+            <button class="tab-btn" id="tab-btn-project" onclick="switchTab('project')"><i class="fas fa-folder-open"></i> פרויקט</button>
+        </div>
+
+        <div id="panel-draw" class="tab-panel">
+
+            <div class="section-title">שכפול וסימטריה אוטומטית בזמן אמת</div>
+            <div class="control-group">
+                <select id="symmetry-mode" data-track="true">
+                    <option value="none">ללא</option>
+                    <option value="mirror_right">השתקפות לימין (מראה צמודה)</option>
+                    <option value="mirror_left">השתקפות לשמאל (מראה צמודה)</option>
+                    <option value="radial_4">מעגלית (4 שכפולים)</option>
+                    <option value="radial_6">מעגלית (6 שכפולים)</option>
+                    <option value="radial_8">מעגלית (8 שכפולים)</option>
+                    <option value="radial_12">מעגלית (12 שכפולים)</option>
+                </select>
+            </div>
+            <div class="control-group" id="sym-offset-group" style="display: none;">
+                <label>מרחק / חפיפה: <span id="sym-offset-val">0</span>%</label>
+                <input type="range" id="sym-offset" min="-100" max="100" value="0" data-track="true">
+            </div>
+            
+            <div class="section-title">הגדרות עט</div>
+            <div class="control-group">
+                <label>עובי: <span id="thickness-val">20</span>px</label>
+                <input type="range" id="thickness" min="1" max="150" value="20" data-track="true">
+            </div>
+            <div class="control-group">
+                <label>רגישות החלקה: <span id="smoothing-val">15</span></label>
+                <input type="range" id="smoothing" min="1" max="40" value="15" data-track="true">
+            </div>
+            <div class="control-group">
+                <label>אפקט התכווצות: <span id="contraction-val">5</span>%</label>
+                <input type="range" id="contraction" min="0" max="100" value="5" data-track="true">
+            </div>
+            <div class="control-group">
+                <label>סגנון עט:</label>
+                <select id="pen-style" data-track="true">
+                    <option value="uniform">רוחב אחיד</option>
+                    <option value="tapered">מתחדד (שפיץ בסוף)</option>
+                    <option value="double_tapered" selected>מתרחב ומתחדד (שפיץ בקצוות)</option>
+                    <option value="thin_horizontal">צר במאוזן (קליגרפיה)</option>
+                    <option value="thin_vertical">צר במאונך (קליגרפיה)</option>
+                    <option value="image_brush">מברשת תמונה (PNG)</option>
+                </select>
+            </div>
+            <div id="brush-image-controls" class="control-group" style="display: none;">
+                <label>בחר תמונת מברשת:</label>
+                <input type="file" id="brush-upload" accept="image/png, image/jpeg">
+            </div>
+            <div id="brush-color-controls" class="control-group" style="display: none;">
+                <label>צבע המברשת:</label>
+                <select id="brush-color-mode" data-track="true">
+                    <option value="original">צבעי התמונה המקורית</option>
+                    <option value="color">השתמש בצבע העט הנבחר</option>
+                </select>
+            </div>
+        </div>
+
+        <div id="panel-edit" class="tab-panel" style="display: none;">
+            <div class="section-title">כלים לבחירה הנוכחית</div>
+            
+            <div class="control-group" id="edit-smoothing-group" style="display:none; margin-bottom: 4px;">
+                <label>החלקת קו נבחר: <span id="edit-smoothing-val">15</span></label>
+                <input type="range" id="edit-smoothing" min="1" max="40" value="15" data-track="true">
+            </div>
+            <div class="control-group" id="edit-thickness-group" style="display:none; margin-bottom: 4px;">
+                <label>עובי קו נבחר: <span id="edit-thickness-slider-val">20</span>px</label>
+                <input type="range" id="edit-thickness-slider" min="1" max="150" value="20" data-track="true">
+            </div>
+            <div class="control-group" id="edit-contraction-group" style="display:none; margin-bottom: 8px;">
+                <label>התכווצות קו נבחר: <span id="edit-contraction-slider-val">5</span>%</label>
+                <input type="range" id="edit-contraction-slider" min="0" max="100" value="5" data-track="true">
+            </div>
+
+            <div class="btn-group">
+                <button class="btn action" id="select-all-btn" title="Ctrl+A"><i class="fas fa-check-double"></i> בחר הכל</button>
+                <button class="btn action" id="group-btn" title="Ctrl+G"><i class="fas fa-object-group"></i> קבץ</button>
+                <button class="btn action" id="ungroup-btn" title="Ctrl+Shift+G"><i class="fas fa-object-ungroup"></i> פרק</button>
+            </div>
+            <div class="btn-group" id="length-tools" style="display:none;">
+                <button class="btn action" id="lengthen-btn"><i class="fas fa-expand-arrows-alt"></i> הארך</button>
+                <button class="btn action" id="shorten-btn"><i class="fas fa-compress-arrows-alt"></i> קצר</button>
+                <button class="btn action" id="edit-thickness-btn"><i class="fas fa-compress"></i> ערוך מרכז קו</button>
+            </div>
+            <div class="btn-group">
+                <button class="btn success" id="duplicate-btn" title="Ctrl+D"><i class="fas fa-copy"></i> שכפל </button>
+                <button class="btn danger" id="delete-btn" title="Delete"><i class="fas fa-trash"></i> מחק </button>
+            </div>
+            
+            <div class="section-title">תלת מימד (3D) ואפקטים</div>
+            <div class="control-group">
+                <select id="effect-3d-type" data-track="true">
+                    <option value="none">ללא תלת מימד</option>
+                    <option value="shadow">הצללה רכה</option>
+                    <option value="extrude">תלת מימד מלא (Extrude)</option>
+                </select>
+            </div>
+            <div id="effect-3d-settings" style="display: none; flex-direction: column; gap:4px;">
+                <div class="control-group">
+                    <label>כיוון 3D בשכפול:</label>
+                    <select id="effect-3d-symmetry" data-track="true">
+                        <option value="mirror">הפוך (מראה)</option>
+                        <option value="parallel">זהה למקור (המשך)</option>
+                    </select>
+                </div>
+                <div class="control-group">
+                    <label>זווית הסתכלות: <span id="effect-angle-val">45</span>°</label>
+                    <input type="range" id="effect-angle" min="0" max="360" value="45" data-track="true">
+                </div>
+                <div class="control-group">
+                    <label>עוצמת עומק / מרחק: <span id="effect-depth-val">10</span>px</label>
+                    <input type="range" id="effect-depth" min="1" max="50" value="10" data-track="true">
+                </div>
+                <div class="control-group">
+                    <label>צבע קיר עומק:</label>
+                    <select id="effect-depth-color-mode" data-track="true">
+                        <option value="custom">צבע קבוע מראש</option>
+                        <option value="auto">אוטומטי (כהה מצבע הצורה)</option>
+                    </select>
+                </div>
+                <div class="control-group" id="depth-color-custom-group">
+                    <input type="color" id="effect-depth-color" value="#8b6508" data-track="true">
+                </div>
+                <div class="control-group" id="depth-color-auto-group" style="display: none;">
+                    <label>עוצמת הצללה: <span id="effect-darken-val">40</span>%</label>
+                    <input type="range" id="effect-darken" min="0" max="100" value="40" data-track="true">
+                </div>
+            </div>
+            <p id="edit-hint" style="font-size: 11px; color: #aaa; text-align: center; margin-top:2px; line-height: 1.2;">
+                לחץ לבחירה, החזק Ctrl לבחירה מרובה.<br>גרור למינוס כדי להפוך כיוון.
+            </p>
+        </div>
+
+        <div id="panel-color" class="tab-panel">
+            <div class="section-title">צבע כללי של הקנבס</div>
+            <div class="control-group">
+                <select id="fill-type" data-track="true">
+                    <option value="solid">צבע אחיד כללי</option>
+                    <option value="gradient">מעבר צבע כללי (Gradient)</option>
+                    <option value="image">מילוי תמונת רקע (Pattern)</option>
+                </select>
+            </div>
+            <div id="solid-controls" class="control-group">
+                <input type="color" id="solid-color" value="#d4af37" data-track="true">
+            </div>
+            <div id="gradient-controls" class="control-group" style="display: none;">
+                <div id="gradient-colors">
+                    <div class="grad-color-row"><input type="color" class="grad-color" value="#f1c40f"></div>
+                    <div class="grad-color-row"><input type="color" class="grad-color" value="#8b6508"></div>
+                </div>
+                <button class="btn" id="add-color-btn" style="margin-top:5px;"><i class="fas fa-plus"></i> הוסף צבע</button>
+                <input type="number" id="grad-angle" value="45" placeholder="זווית (מעלות)" data-track="true">
+            </div>
+            <div id="image-controls" class="control-group" style="display: none;">
+                <input type="file" id="image-upload" accept="image/*">
+            </div>
+        </div>
+
+        <div id="panel-project" class="tab-panel" style="display: none;">
+            
+            <div class="section-title">שמירה וטעינת פרויקט</div>
+            <div class="btn-group">
+                <button class="btn success" id="save-project-btn"><i class="fas fa-save"></i> שמור פרויקט</button>
+                <button class="btn success" id="import-project-btn"><i class="fas fa-folder-open"></i> יבא פרויקט</button>
+                <input type="file" id="project-upload" accept=".json" style="display: none;">
+            </div>
+            
+            <div class="btn-group" style="margin-top: 5px;">
+                <button class="btn action" id="flatten-btn" style="width: 100%;"><i class="fas fa-compress-alt"></i> שטח סימטריה לעיטור (Flatten)</button>
+            </div>
+
+            <div class="section-title">ייצוא וייבוא גרפיקה</div>
+            <div class="btn-group">
+                <button class="btn primary" id="download-png-btn"><i class="fas fa-download"></i> ייצא תמונה (PNG)</button>
+                <button class="btn vector" id="download-svg-btn"><i class="fas fa-download"></i> ייצא וקטור (SVG)</button>
+            </div>
+            
+            <button class="btn drive" id="save-to-drive-btn"><i class="fas fa-cloud-upload-alt"></i> שמור צורה לגלריה הציבורית</button>
+            <a href="עיטורים.HTML" class="btn gallery"><i class="fas fa-images"></i> יבא עיטורים מהאתר (גלריה)</a>
+
+            <div class="btn-group" style="margin-top: 5px;">
+                <button class="btn action" id="import-svg-btn" style="width: 100%;"><i class="fas fa-file-import"></i> ייבא קובץ SVG למסך</button>
+                <input type="file" id="svg-upload" accept=".svg" style="display: none;">
+            </div>
+        </div>
+
+        <div style="margin-top: auto; display: flex; flex-direction: column; gap: 8px;">
+            <div class="btn-group">
+                <button class="btn action" id="undo-btn" title="Ctrl+Z"><i class="fas fa-reply"></i> ביטול פעולה</button>
+                <button class="btn action" id="redo-btn" title="Ctrl+Y"><i class="fas fa-share"></i> בצע שוב</button>
+            </div>
+            <button class="btn danger" id="clear-btn"><i class="fas fa-trash-alt"></i> מחק לוח</button>
+        </div>
+    </div>
+
+    <div id="advanced-sidebar">
+        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 10px; margin-bottom: 5px;">
+            <h2 style="color: var(--gold); margin: 0; font-size: 20px;"><i class="fas fa-magic"></i> עריכה מתקדמת</h2>
+            <button id="close-advanced-btn" style="background: none; border: none; color: #888; cursor: pointer; font-size: 18px; transition: 0.2s;"><i class="fas fa-times"></i></button>
+        </div>
+
+        <div class="tabs-container">
+            <button class="tab-btn active" id="tab-btn-adv-add" onclick="switchAdvTab('add')"><i class="fas fa-shapes"></i> הוספת צורה</button>
+            <button class="tab-btn" id="tab-btn-adv-edit" onclick="switchAdvTab('edit')"><i class="fas fa-palette"></i> מילוי וצבע אישי</button>
+        </div>
+
+        <div id="panel-adv-add" class="tab-panel">
+            <div class="section-title">בחר צורה מהירה</div>
+            <div id="shapes-gallery" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;">
+                </div>
+        </div>
+
+        <div id="panel-adv-edit" class="tab-panel" style="display: none;">
+            
+            <div class="section-title">הגדרות מילוי (לצורה נבחרת / לדלי)</div>
+            <div class="control-group">
+                <select id="adv-fill-interior">
+                    <option value="none">ללא מילוי פנימי</option>
+                    <option value="solid" selected>מילוי בצבע אחיד</option>
+                    <option value="gradient">מילוי במעבר צבע (גרדיאנט)</option>
+                </select>
+            </div>
+            <div class="control-group" id="adv-fill-solid-group">
+                <input type="color" id="adv-fill-color" value="#e74c3c">
+            </div>
+            <div class="control-group" id="adv-fill-grad-group" style="display: none;">
+                <div id="adv-fill-gradient-colors">
+                    <div class="grad-color-row"><input type="color" class="adv-fill-grad-color" value="#00ff00"></div>
+                    <div class="grad-color-row"><input type="color" class="adv-fill-grad-color" value="#ffff00"></div>
+                </div>
+                <button class="btn" id="adv-add-fill-color-btn" style="margin-top:5px;"><i class="fas fa-plus"></i> הוסף צבע לגרדיאנט</button>
+                <input type="number" id="adv-fill-grad-angle" value="45" placeholder="זווית (מעלות)" data-track="true">
+            </div>
+            
+            <p style="font-size: 11px; color: #aaa; text-align: center; margin-top: 5px; line-height: 1.3;">
+                הגדרות אלו ישנו אוטומטית את המילוי הרגיל של הצורה <b>הנבחרת</b>. 
+                <br><br>
+                כדי למלא חלל ריק שנוצר מהצטלבויות של קווים נפרדים (Smart Fill), השתמש בכלי הדלי:
+            </p>
+
+            <div class="btn-group" style="margin-bottom: 5px;">
+                <button class="btn action" id="bucket-btn" title="מלא חללים סגורים בקליק"><i class="fas fa-fill-drip"></i> הפעל כלי דלי מילוי חכם</button>
+            </div>
+
+            <div class="section-title" style="margin-top: 15px;">צבע קו מסגרת אישי (לצורות קיימות)</div>
+            <div class="control-group">
+                <select id="adv-stroke-color-mode">
+                    <option value="global">צבע כללי מהקנבס</option>
+                    <option value="custom_solid">צבע אחיד מותאם אישית</option>
+                    <option value="custom_gradient">מעבר צבע (גרדיאנט) מותאם אישית</option>
+                </select>
+            </div>
+            <div class="control-group" id="adv-stroke-solid-group" style="display: none;">
+                <input type="color" id="adv-stroke-color" value="#ffffff">
+            </div>
+            <div class="control-group" id="adv-stroke-grad-group" style="display: none;">
+                <div class="color-inputs-row">
+                    <input type="color" id="adv-stroke-grad-1" value="#ff0000">
+                    <input type="color" id="adv-stroke-grad-2" value="#0000ff">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('drawing-canvas');
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+        const tempCanvas = document.getElementById('temp-canvas');
+        const tempCtx = tempCanvas.getContext('2d', { willReadFrequently: true });
+        const container = document.getElementById('canvas-container');
+        const cursor = document.getElementById('custom-cursor');
+
+        const thicknessEl = document.getElementById('thickness'), smoothingEl = document.getElementById('smoothing'), contractionEl = document.getElementById('contraction'), penStyleEl = document.getElementById('pen-style'), symmetryModeEl = document.getElementById('symmetry-mode'), symOffsetEl = document.getElementById('sym-offset');
+        const editSmoothingEl = document.getElementById('edit-smoothing'), editSmoothingGroup = document.getElementById('edit-smoothing-group');
+        const editThicknessEl = document.getElementById('edit-thickness-slider'), editThicknessGroup = document.getElementById('edit-thickness-group');
+        const editContractionEl = document.getElementById('edit-contraction-slider'), editContractionGroup = document.getElementById('edit-contraction-group');
+        
+        const fillTypeEl = document.getElementById('fill-type'), solidColorEl = document.getElementById('solid-color'), gradAngleEl = document.getElementById('grad-angle'), gradientColorsContainer = document.getElementById('gradient-colors'), imageUploadEl = document.getElementById('image-upload');
+        const effect3DTypeEl = document.getElementById('effect-3d-type'), effectAngleEl = document.getElementById('effect-angle'), effectDepthEl = document.getElementById('effect-depth'), effectDepthColorModeEl = document.getElementById('effect-depth-color-mode'), effectDepthColorEl = document.getElementById('effect-depth-color'), effectDarkenEl = document.getElementById('effect-darken'), effect3DSymmetryEl = document.getElementById('effect-3d-symmetry'), effect3DSettings = document.getElementById('effect-3d-settings');
+        const lengthTools = document.getElementById('length-tools'), editHint = document.getElementById('edit-hint');
+        
+        // משתני הפאנל המתקדם
+        const advStrokeColorModeEl = document.getElementById('adv-stroke-color-mode');
+        const advStrokeSolidGroup = document.getElementById('adv-stroke-solid-group');
+        const advStrokeGradGroup = document.getElementById('adv-stroke-grad-group');
+        const advStrokeColorEl = document.getElementById('adv-stroke-color');
+        const advStrokeGrad1 = document.getElementById('adv-stroke-grad-1');
+        const advStrokeGrad2 = document.getElementById('adv-stroke-grad-2');
+
+        const advFillInteriorEl = document.getElementById('adv-fill-interior');
+        const advFillSolidGroup = document.getElementById('adv-fill-solid-group');
+        const advFillGradGroup = document.getElementById('adv-fill-grad-group');
+        const advFillColorEl = document.getElementById('adv-fill-color');
+        const advFillGradAngleEl = document.getElementById('adv-fill-grad-angle');
+
+        const layersBtn = document.getElementById('btn-layers-toggle');
+        const layersPanel = document.getElementById('layers-panel-container');
+        const layersList = document.getElementById('layers-list');
+        const brushUploadEl = document.getElementById('brush-upload');
+
+        let strokes = []; 
+        let currentActiveStroke = null; 
+        
+        let undoStack = []; 
+        let redoStack = []; 
+        let isUndoingOrRedoing = false; 
+        
+        let appMode = 'draw'; 
+        let selectedIndices = []; 
+        let copiedStrokes = null;
+        let patternImage = null;
+        let globalBrushImage = null; 
+        
+        let transformAction = null; 
+        let transformStartMouse = null;
+        let originalStrokesData = []; 
+        let originalBounds = null; 
+
+        let logicalWidth = 0, logicalHeight = 0, canvasRect = null;
+        let camX = 0, camY = 0, zoom = 1, angle = 0; 
+        let isPanning = false, panStartMouse = null, panStartCam = null;
+        let isDrawing = false, spacePressed = false;
+
+        let isMarqueeSelecting = false;
+        let marqueeStart = null;
+        let marqueeEnd = null;
+
+        function isSafeText(text) {
+            const safeRegex = /^[א-תa-zA-Z0-9\s\-_]+$/;
+            return safeRegex.test(text);
+        }
+
+        function isSafeFileName(filename) {
+            const safeRegex = /^[א-תa-zA-Z0-9\s\-_\.\(\)]+$/;
+            return safeRegex.test(filename);
+        }
+
+        function mergeGroupPaths(paths) {
+            if (!paths || paths.length === 0) return [];
+            if (paths.length === 1) return paths[0];
+            let unmerged = paths.map(p => [...p]); 
+            let merged = unmerged.shift(); 
+            while (unmerged.length > 0) {
+                let lastPoint = merged[merged.length - 1];
+                let firstPoint = merged[0];
+                let bestIdx = -1, bestIsReverse = false, bestDist = Infinity, attachToFront = false;
+                for (let i = 0; i < unmerged.length; i++) {
+                    let p = unmerged[i], pFirst = p[0], pLast = p[p.length - 1];
+                    let d1 = Math.hypot(pFirst.x - lastPoint.x, pFirst.y - lastPoint.y);
+                    let d2 = Math.hypot(pLast.x - lastPoint.x, pLast.y - lastPoint.y);
+                    let d3 = Math.hypot(pFirst.x - firstPoint.x, pFirst.y - firstPoint.y);
+                    let d4 = Math.hypot(pLast.x - firstPoint.x, pLast.y - firstPoint.y);
+                    let minD = Math.min(d1, d2, d3, d4);
+                    if (minD < bestDist) {
+                        bestDist = minD; bestIdx = i;
+                        if (minD === d1) { bestIsReverse = false; attachToFront = false; }
+                        else if (minD === d2) { bestIsReverse = true; attachToFront = false; }
+                        else if (minD === d3) { bestIsReverse = true; attachToFront = true; }
+                        else if (minD === d4) { bestIsReverse = false; attachToFront = true; }
+                    }
+                }
+                if (bestIdx !== -1) {
+                    let toAdd = unmerged.splice(bestIdx, 1)[0];
+                    if (bestIsReverse) toAdd.reverse();
+                    if (attachToFront) merged = toAdd.concat(merged);
+                    else merged = merged.concat(toAdd);
+                } else break; 
+            }
+            return merged;
+        }
+        
+        let tintedBrushCache = { color: '', img: null };
+        function getTintedBrush(img, color) {
+            if (tintedBrushCache.color === color && tintedBrushCache.img) return tintedBrushCache.img;
+            const c = document.createElement('canvas');
+            c.width = img.width || 100;
+            c.height = img.height || 100;
+            const tCtx = c.getContext('2d');
+            tCtx.drawImage(img, 0, 0, c.width, c.height);
+            tCtx.globalCompositeOperation = 'source-in'; 
+            tCtx.fillStyle = color;
+            tCtx.fillRect(0, 0, c.width, c.height);
+            tintedBrushCache.color = color;
+            tintedBrushCache.img = c;
+            return c;
+        }
+
+        layersBtn.addEventListener('click', () => { layersPanel.style.display = layersPanel.style.display === 'none' || layersPanel.style.display === '' ? 'block' : 'none'; });
+
+        function updateLayersPanel() {
+            layersList.innerHTML = '';
+            [...strokes].forEach((stroke, idx) => {
+                const item = document.createElement('div');
+                item.className = `layer-item ${selectedIndices.includes(idx) ? 'selected' : ''}`;
+                item.draggable = true;
+                item.innerHTML = `<span>שכבה ${idx + 1}</span><span class="layer-drag-indicator">☰</span>`;
+                
+                item.addEventListener('click', (e) => {
+                    if (e.ctrlKey || e.metaKey) { if (selectedIndices.includes(idx)) selectedIndices = selectedIndices.filter(i => i !== idx); else selectedIndices.push(idx); } else { selectedIndices = [idx]; }
+                    if (appMode !== 'edit' && appMode !== 'lengthen' && appMode !== 'shorten' && appMode !== 'edit-thickness') { setAppMode('edit'); } 
+                    else { lengthTools.style.display = selectedIndices.length === 1 ? 'flex' : 'none'; update3DUI(); redrawAll(); updateLayersPanel(); }
+                });
+                item.addEventListener('dragstart', (e) => { e.dataTransfer.setData('text/plain', idx); });
+                item.addEventListener('dragover', (e) => { e.preventDefault(); item.style.borderTop = "2px solid #d4af37"; });
+                item.addEventListener('dragleave', (e) => { item.style.borderTop = "1px solid #444"; });
+                item.addEventListener('drop', (e) => {
+                    e.preventDefault(); item.style.borderTop = "1px solid #444"; const fromIdx = parseInt(e.dataTransfer.getData('text/plain'));
+                    if (fromIdx !== idx) { pushUndo({ type: 'reorder', oldStrokes: [...strokes] }); const moved = strokes.splice(fromIdx, 1)[0]; strokes.splice(idx, 0, moved); selectedIndices = [idx]; redrawAll(); updateLayersPanel(); }
+                });
+                layersList.prepend(item);
+            });
+        }
+
+        function switchTab(tab) {
+            ['draw', 'edit', 'project'].forEach(t => { document.getElementById(`tab-btn-${t}`).classList.remove('active'); document.getElementById(`panel-${t}`).style.display = 'none'; });
+            document.getElementById(`tab-btn-${tab}`).classList.add('active'); document.getElementById(`panel-${tab}`).style.display = 'flex';
+            document.getElementById('panel-color').style.display = (tab === 'draw' || tab === 'edit') ? 'flex' : 'none';
+            if (tab === 'draw') setAppMode('draw'); else if (tab === 'edit') setAppMode('edit'); else if (tab === 'project') setAppMode('project');
+        }
+
+        function setAppMode(mode) {
+            appMode = mode;
+            ['btn-pan', 'lengthen-btn', 'shorten-btn', 'edit-thickness-btn', 'bucket-btn'].forEach(id => {
+                let el = document.getElementById(id);
+                if(el) el.classList.remove('active');
+            });
+
+            if(mode === 'lengthen') document.getElementById('lengthen-btn').classList.add('active');
+            if(mode === 'shorten') document.getElementById('shorten-btn').classList.add('active');
+            if(mode === 'edit-thickness') document.getElementById('edit-thickness-btn').classList.add('active');
+            if(mode === 'pan') document.getElementById('btn-pan').classList.add('active');
+            if(mode === 'bucket') document.getElementById('bucket-btn').classList.add('active');
+            
+            if (mode !== 'edit' && mode !== 'lengthen' && mode !== 'shorten' && mode !== 'edit-thickness') { selectedIndices = []; lengthTools.style.display = 'none'; }
+            if (mode === 'edit') editHint.innerHTML = "לחץ לבחירה, החזק Ctrl לבחירה מרובה.<br>גרור למינוס כדי להפוך כיוון.";
+            if (mode === 'lengthen') editHint.innerText = "גרור את קצוות הקו החוצה להארכה.";
+            if (mode === 'shorten') editHint.innerText = "גרור את הקצוות פנימה לקיצור מדויק.";
+            if (mode === 'edit-thickness') editHint.innerText = "גרור את הנקודה הצהובה כדי לשנות את מיקום שיא העובי.";
+
+            updateCursorVisibility(); update3DUI(); redrawAll(); updateLayersPanel();
+        }
+
+        document.getElementById('btn-pan').addEventListener('click', () => { setAppMode(appMode === 'pan' ? (document.getElementById('panel-edit').style.display !== 'none' ? 'edit' : 'draw') : 'pan'); });
+        document.getElementById('bucket-btn').addEventListener('click', () => { setAppMode(appMode === 'bucket' ? 'draw' : 'bucket'); });
+        document.getElementById('lengthen-btn').addEventListener('click', () => setAppMode('lengthen'));
+        document.getElementById('shorten-btn').addEventListener('click', () => setAppMode('shorten'));
+        document.getElementById('edit-thickness-btn').addEventListener('click', () => setAppMode('edit-thickness'));
+
+        penStyleEl.addEventListener('change', (e) => { 
+            const isImage = e.target.value === 'image_brush';
+            document.getElementById('brush-image-controls').style.display = isImage ? 'flex' : 'none'; 
+            document.getElementById('brush-color-controls').style.display = isImage ? 'flex' : 'none'; 
+        });
+        
+        brushUploadEl.addEventListener('change', (e) => { 
+            const file = e.target.files[0]; if (!file) return;
+            if (!isSafeFileName(file.name)) {
+                alert('שם הקובץ אינו חוקי. יש להעלות קבצים בעלי שם ללא סימנים מיוחדים.');
+                e.target.value = ''; return;
+            }
+            const reader = new FileReader(); reader.onload = (event) => { const img = new Image(); img.onload = () => { globalBrushImage = img; }; img.src = event.target.result; }; reader.readAsDataURL(file); 
+        });
+
+        function pushUndo(action) { if (isUndoingOrRedoing) return; undoStack.push(action); redoStack = []; if (undoStack.length > 50) undoStack.shift(); }
+
+        function performUndo() { 
+            if (undoStack.length === 0) return; isUndoingOrRedoing = true; const action = undoStack.pop(); let redoAction = { ...action };
+            switch(action.type) {
+                case 'draw': redoAction.stroke = strokes.pop(); break;
+                case 'delete': action.items.sort((a,b) => a.idx - b.idx).forEach(item => strokes.splice(item.idx, 0, item.stroke)); selectedIndices = action.items.map(item => item.idx); break;
+                case 'transform': action.changes.forEach(change => strokes[change.idx].points = change.oldPoints.map(p=>({...p}))); break;
+                case 'edit_style': action.changes.forEach(c => { 
+                    if(c.oldSmooth !== undefined) strokes[c.idx].style.smoothingLevel = c.oldSmooth; 
+                    if(c.oldPeak !== undefined) strokes[c.idx].style.thicknessPeak = c.oldPeak; 
+                    if(c.oldThick !== undefined) strokes[c.idx].style.thickness = c.oldThick;
+                    if(c.oldCont !== undefined) strokes[c.idx].style.contraction = c.oldCont;
+                }); break;
+                case 'clear': strokes = action.oldStrokes; break;
+                case 'reorder': redoAction.oldStrokes = [...strokes]; strokes = action.oldStrokes; break;
+                case 'gradient_change': setGradientColors(action.oldColors); break;
+                case 'ui_change': const el = document.getElementById(action.id); if (el) { el.value = action.oldVal; el.dispatchEvent(new Event('input')); el.dispatchEvent(new Event('change')); const labelVal = document.getElementById(`${action.id}-val`); if(labelVal) labelVal.innerText = action.oldVal; } break;
+            }
+            redoStack.push(redoAction); lengthTools.style.display = selectedIndices.length === 1 ? 'flex' : 'none'; update3DUI(); redrawAll(); updateLayersPanel(); isUndoingOrRedoing = false;
+        }
+
+        function performRedo() {
+            if (redoStack.length === 0) return; isUndoingOrRedoing = true; const action = redoStack.pop(); let undoAction = { ...action };
+            switch(action.type) {
+                case 'draw': strokes.push(action.stroke); break;
+                case 'delete': action.items.sort((a,b)=>b.idx - a.idx).forEach(item => strokes.splice(item.idx, 1)); selectedIndices = []; break;
+                case 'transform': action.changes.forEach(change => strokes[change.idx].points = change.newPoints.map(p=>({...p}))); break;
+                case 'edit_style': action.changes.forEach(c => { 
+                    if(c.newSmooth !== undefined) strokes[c.idx].style.smoothingLevel = c.newSmooth; 
+                    if(c.newPeak !== undefined) strokes[c.idx].style.thicknessPeak = c.newPeak; 
+                    if(c.newThick !== undefined) strokes[c.idx].style.thickness = c.newThick;
+                    if(c.newCont !== undefined) strokes[c.idx].style.contraction = c.newCont;
+                }); break;
+                case 'clear': undoAction.oldStrokes = [...strokes]; strokes = []; selectedIndices = []; break;
+                case 'reorder': undoAction.oldStrokes = [...strokes]; strokes = action.oldStrokes; break;
+                case 'gradient_change': setGradientColors(action.newColors); break;
+                case 'ui_change': const el = document.getElementById(action.id); if (el) { el.value = action.newVal; el.dispatchEvent(new Event('input')); el.dispatchEvent(new Event('change')); const labelVal = document.getElementById(`${action.id}-val`); if(labelVal) labelVal.innerText = action.newVal; } break;
+            }
+            undoStack.push(undoAction); lengthTools.style.display = selectedIndices.length === 1 ? 'flex' : 'none'; update3DUI(); redrawAll(); updateLayersPanel(); isUndoingOrRedoing = false;
+        }
+
+        document.querySelectorAll('input[data-track="true"], select[data-track="true"]').forEach(el => {
+            if (el.classList.contains('grad-color')) return; 
+            el.addEventListener('focus', () => { el.dataset.oldVal = el.value; }); el.addEventListener('mousedown', () => { el.dataset.oldVal = el.value; });
+            el.addEventListener('change', () => { const oldVal = el.dataset.oldVal !== undefined ? el.dataset.oldVal : el.defaultValue; if(oldVal !== el.value) { pushUndo({ type: 'ui_change', id: el.id, oldVal: oldVal, newVal: el.value }); el.dataset.oldVal = el.value; } });
+        });
+
+        function resize() { canvasRect = container.getBoundingClientRect(); logicalWidth = canvasRect.width; logicalHeight = canvasRect.height; const dpr = window.devicePixelRatio || 1; canvas.width = logicalWidth * dpr; canvas.height = logicalHeight * dpr; tempCanvas.width = canvas.width; tempCanvas.height = canvas.height; ctx.scale(dpr, dpr); tempCtx.scale(dpr, dpr); redrawAll(); }
+        window.addEventListener('resize', resize); setTimeout(resize, 0); 
+
+        thicknessEl.addEventListener('input', (e) => { document.getElementById('thickness-val').innerText = e.target.value; updateCursorSize(); });
+        smoothingEl.addEventListener('input', (e) => { document.getElementById('smoothing-val').innerText = e.target.value; });
+        contractionEl.addEventListener('input', (e) => { document.getElementById('contraction-val').innerText = e.target.value; });
+
+        let oldEditSmoothLevel = null, oldEditThickness = null, oldEditContraction = null;
+        
+        editSmoothingEl.addEventListener('mousedown', () => { if(selectedIndices.length>0) oldEditSmoothLevel = strokes[selectedIndices[0]].style.smoothingLevel; });
+        editSmoothingEl.addEventListener('input', (e) => { 
+            document.getElementById('edit-smoothing-val').innerText = e.target.value; 
+            if (selectedIndices.length > 0) { selectedIndices.forEach(idx => strokes[idx].style.smoothingLevel = parseInt(e.target.value)); redrawAll(); }
+        });
+        editSmoothingEl.addEventListener('change', (e) => {
+            if (selectedIndices.length > 0 && oldEditSmoothLevel !== null) {
+                let changes = selectedIndices.map(idx => ({ idx: idx, oldSmooth: oldEditSmoothLevel, newSmooth: parseInt(e.target.value) }));
+                pushUndo({ type: 'edit_style', changes: changes }); updateLayersPanel();
+            }
+        });
+
+        editThicknessEl.addEventListener('mousedown', () => { if(selectedIndices.length>0) oldEditThickness = strokes[selectedIndices[0]].style.thickness; });
+        editThicknessEl.addEventListener('input', (e) => { 
+            document.getElementById('edit-thickness-slider-val').innerText = e.target.value; 
+            if (selectedIndices.length > 0) { selectedIndices.forEach(idx => strokes[idx].style.thickness = parseFloat(e.target.value)); redrawAll(); }
+        });
+        editThicknessEl.addEventListener('change', (e) => {
+            if (selectedIndices.length > 0 && oldEditThickness !== null) {
+                let changes = selectedIndices.map(idx => ({ idx: idx, oldThick: oldEditThickness, newThick: parseFloat(e.target.value) }));
+                pushUndo({ type: 'edit_style', changes: changes }); updateLayersPanel();
+            }
+        });
+
+        editContractionEl.addEventListener('mousedown', () => { if(selectedIndices.length>0) oldEditContraction = strokes[selectedIndices[0]].style.contraction; });
+        editContractionEl.addEventListener('input', (e) => { 
+            document.getElementById('edit-contraction-slider-val').innerText = e.target.value; 
+            if (selectedIndices.length > 0) { selectedIndices.forEach(idx => strokes[idx].style.contraction = parseFloat(e.target.value)/100); redrawAll(); }
+        });
+        editContractionEl.addEventListener('change', (e) => {
+            if (selectedIndices.length > 0 && oldEditContraction !== null) {
+                let changes = selectedIndices.map(idx => ({ idx: idx, oldCont: oldEditContraction, newCont: parseFloat(e.target.value)/100 }));
+                pushUndo({ type: 'edit_style', changes: changes }); updateLayersPanel();
+            }
+        });
+
+        symmetryModeEl.addEventListener('change', (e) => { 
+            const val = e.target.value;
+            document.getElementById('sym-offset-group').style.display = (val === 'mirror_right' || val === 'mirror_left') ? 'flex' : 'none';
+            redrawAll(); 
+        }); 
+        symOffsetEl.addEventListener('input', (e) => { document.getElementById('sym-offset-val').innerText = e.target.value; redrawAll(); });
+        
+        // גרדיאנט ראשי של הקנבס
+        fillTypeEl.addEventListener('change', (e) => { document.getElementById('solid-controls').style.display = e.target.value === 'solid' ? 'flex' : 'none'; document.getElementById('gradient-controls').style.display = e.target.value === 'gradient' ? 'flex' : 'none'; document.getElementById('image-controls').style.display = e.target.value === 'image' ? 'flex' : 'none'; redrawAll(); updateLayersPanel(); });
+        solidColorEl.addEventListener('input', () => { redrawAll(); updateLayersPanel(); }); gradAngleEl.addEventListener('input', () => redrawAll());
+        
+        function getGradientColors() { return Array.from(document.querySelectorAll('#gradient-colors .grad-color')).map(i => i.value); } let tempOldGradColors = null;
+        function bindGradientInputUndo(inputEl) { inputEl.addEventListener('focus', () => { tempOldGradColors = getGradientColors(); }); inputEl.addEventListener('mousedown', () => { tempOldGradColors = getGradientColors(); }); inputEl.addEventListener('change', () => { const newC = getGradientColors(); if (tempOldGradColors && JSON.stringify(tempOldGradColors) !== JSON.stringify(newC)) { pushUndo({ type: 'gradient_change', oldColors: tempOldGradColors, newColors: newC }); tempOldGradColors = newC; } updateLayersPanel(); }); }
+        
+        function setGradientColors(colors) { gradientColorsContainer.innerHTML = ''; if (!colors || colors.length === 0) colors = ['#f1c40f', '#8b6508']; if (colors.length === 1) colors.push('#8b6508'); colors.forEach((c, i) => { const row = document.createElement('div'); row.className = 'grad-color-row'; if (i < 2) row.innerHTML = `<input type="color" class="grad-color" value="${c}">`; else row.innerHTML = `<input type="color" class="grad-color" value="${c}"><span class="remove-color">X</span>`; gradientColorsContainer.appendChild(row); const inp = row.querySelector('input'); inp.addEventListener('input', () => redrawAll()); bindGradientInputUndo(inp); if (i >= 2) { row.querySelector('.remove-color').addEventListener('click', () => { let oldC = getGradientColors(); row.remove(); pushUndo({ type: 'gradient_change', oldColors: oldC, newColors: getGradientColors() }); redrawAll(); updateLayersPanel(); }); } }); redrawAll(); updateLayersPanel(); }
+
+        document.getElementById('add-color-btn').addEventListener('click', () => { const oldC = getGradientColors(); const row = document.createElement('div'); row.className = 'grad-color-row'; row.innerHTML = `<input type="color" class="grad-color" value="#ffffff"><span class="remove-color">X</span>`; gradientColorsContainer.appendChild(row); const inp = row.querySelector('input'); inp.addEventListener('input', () => redrawAll()); bindGradientInputUndo(inp); row.querySelector('.remove-color').addEventListener('click', () => { const oldC2 = getGradientColors(); row.remove(); pushUndo({ type: 'gradient_change', oldColors: oldC2, newColors: getGradientColors() }); redrawAll(); updateLayersPanel(); }); pushUndo({ type: 'gradient_change', oldColors: oldC, newColors: getGradientColors() }); redrawAll(); updateLayersPanel(); });
+        document.querySelectorAll('#gradient-colors .grad-color').forEach(el => { el.addEventListener('input', () => redrawAll()); bindGradientInputUndo(el); });
+        
+        imageUploadEl.addEventListener('change', (e) => { 
+            const file = e.target.files[0]; if (!file) return;
+            if (!isSafeFileName(file.name)) {
+                alert('שם הקובץ אינו חוקי. יש להעלות קבצים בעלי שם ללא סימנים מיוחדים.');
+                e.target.value = ''; return;
+            }
+            const reader = new FileReader(); reader.onload = (event) => { const img = new Image(); img.onload = () => { patternImage = img; redrawAll(); updateLayersPanel(); }; img.src = event.target.result; }; reader.readAsDataURL(file); 
+        });
+
+        // --- גרדיאנט פנימי דינמי לפאנל המתקדם ולדלי ---
+        function getAdvFillGradientColors() { return Array.from(document.querySelectorAll('.adv-fill-grad-color')).map(i => i.value); }
+        function bindAdvGradientInputUndo(inputEl) {
+            inputEl.addEventListener('input', () => {
+                selectedIndices.forEach(idx => strokes[idx].style.interiorGradColors = getAdvFillGradientColors());
+                redrawAll(); updateLayersPanel();
+            });
+        }
+        
+        document.getElementById('adv-add-fill-color-btn').addEventListener('click', () => {
+            const container = document.getElementById('adv-fill-gradient-colors');
+            const row = document.createElement('div'); row.className = 'grad-color-row';
+            row.innerHTML = `<input type="color" class="adv-fill-grad-color" value="#ffffff"><span class="remove-color">X</span>`;
+            container.appendChild(row);
+            const inp = row.querySelector('input'); bindAdvGradientInputUndo(inp);
+            row.querySelector('.remove-color').addEventListener('click', () => {
+                row.remove();
+                selectedIndices.forEach(idx => strokes[idx].style.interiorGradColors = getAdvFillGradientColors());
+                redrawAll(); updateLayersPanel();
+            });
+            selectedIndices.forEach(idx => strokes[idx].style.interiorGradColors = getAdvFillGradientColors());
+            redrawAll(); updateLayersPanel();
+        });
+        document.querySelectorAll('.adv-fill-grad-color').forEach(el => bindAdvGradientInputUndo(el));
+        
+        advFillGradAngleEl.addEventListener('input', (e) => {
+            selectedIndices.forEach(idx => strokes[idx].style.interiorGradAngle = parseFloat(e.target.value) || 45);
+            redrawAll();
+        });
+
+        advFillInteriorEl.addEventListener('change', (e) => { 
+            advFillSolidGroup.style.display = e.target.value === 'solid' ? 'flex' : 'none'; 
+            advFillGradGroup.style.display = e.target.value === 'gradient' ? 'flex' : 'none'; 
+            selectedIndices.forEach(idx => {
+                strokes[idx].style.fillInteriorType = e.target.value;
+                if(e.target.value === 'solid') strokes[idx].style.interiorColor = advFillColorEl.value;
+                if(e.target.value === 'gradient') {
+                    strokes[idx].style.interiorGradColors = getAdvFillGradientColors();
+                    strokes[idx].style.interiorGradAngle = parseFloat(advFillGradAngleEl.value) || 45;
+                }
+            }); 
+            redrawAll(); updateLayersPanel(); 
+        });
+        advFillColorEl.addEventListener('input', (e) => { selectedIndices.forEach(idx => strokes[idx].style.interiorColor = e.target.value); redrawAll(); updateLayersPanel(); });
+
+        advStrokeColorModeEl.addEventListener('change', (e) => { 
+            advStrokeSolidGroup.style.display = e.target.value === 'custom_solid' ? 'flex' : 'none'; 
+            advStrokeGradGroup.style.display = e.target.value === 'custom_gradient' ? 'flex' : 'none'; 
+            selectedIndices.forEach(idx => { 
+                strokes[idx].style.advStrokeMode = e.target.value;
+                if(e.target.value === 'global') { delete strokes[idx].style.customColor; delete strokes[idx].style.strokeGrad; }
+                else if (e.target.value === 'custom_solid') { strokes[idx].style.customColor = advStrokeColorEl.value; }
+                else if (e.target.value === 'custom_gradient') { strokes[idx].style.strokeGrad = [advStrokeGrad1.value, advStrokeGrad2.value]; }
+            }); 
+            redrawAll(); updateLayersPanel(); 
+        });
+        advStrokeColorEl.addEventListener('input', (e) => { selectedIndices.forEach(idx => strokes[idx].style.customColor = e.target.value); redrawAll(); updateLayersPanel(); });
+        advStrokeGrad1.addEventListener('input', (e) => { selectedIndices.forEach(idx => {if(!strokes[idx].style.strokeGrad) strokes[idx].style.strokeGrad=['#ff0000','#0000ff']; strokes[idx].style.strokeGrad[0] = e.target.value;}); redrawAll(); updateLayersPanel(); });
+        advStrokeGrad2.addEventListener('input', (e) => { selectedIndices.forEach(idx => {if(!strokes[idx].style.strokeGrad) strokes[idx].style.strokeGrad=['#ff0000','#0000ff']; strokes[idx].style.strokeGrad[1] = e.target.value;}); redrawAll(); updateLayersPanel(); });
+
+
+        function update3DUI() {
+            if (selectedIndices.length > 0) {
+                const st = strokes[selectedIndices[0]];
+                editSmoothingGroup.style.display = 'flex'; editSmoothingEl.value = st.style.smoothingLevel; document.getElementById('edit-smoothing-val').innerText = st.style.smoothingLevel;
+                
+                editThicknessGroup.style.display = 'flex'; editThicknessEl.value = st.style.thickness; document.getElementById('edit-thickness-slider-val').innerText = st.style.thickness;
+                editContractionGroup.style.display = 'flex'; editContractionEl.value = Math.round(st.style.contraction * 100); document.getElementById('edit-contraction-slider-val').innerText = Math.round(st.style.contraction * 100);
+
+                effect3DTypeEl.value = st.effect3D.type; effectAngleEl.value = st.effect3D.angle; effectDepthEl.value = st.effect3D.depth; 
+                effectDepthColorModeEl.value = st.effect3D.depthColorMode || 'custom'; effectDepthColorEl.value = st.effect3D.depthColor || '#8b6508';
+                effectDarkenEl.value = st.effect3D.depthDarken !== undefined ? st.effect3D.depthDarken : 40; effect3DSymmetryEl.value = st.effect3D.symmetry || 'mirror';
+                document.getElementById('effect-angle-val').innerText = st.effect3D.angle; document.getElementById('effect-depth-val').innerText = st.effect3D.depth; document.getElementById('effect-darken-val').innerText = effectDarkenEl.value;
+                effect3DSettings.style.display = st.effect3D.type === 'none' ? 'none' : 'flex';
+                document.getElementById('depth-color-custom-group').style.display = effectDepthColorModeEl.value === 'custom' ? 'flex' : 'none'; document.getElementById('depth-color-auto-group').style.display = effectDepthColorModeEl.value === 'auto' ? 'flex' : 'none';
+
+                let strokeMode = st.style.advStrokeMode || (st.style.customColor ? 'custom_solid' : 'global');
+                advStrokeColorModeEl.value = strokeMode;
+                advStrokeSolidGroup.style.display = strokeMode === 'custom_solid' ? 'flex' : 'none';
+                advStrokeGradGroup.style.display = strokeMode === 'custom_gradient' ? 'flex' : 'none';
+                advStrokeColorEl.value = st.style.customColor || '#ffffff';
+                if(st.style.strokeGrad && st.style.strokeGrad.length===2) { advStrokeGrad1.value=st.style.strokeGrad[0]; advStrokeGrad2.value=st.style.strokeGrad[1]; }
+
+                let fillMode = st.style.fillInteriorType || 'none';
+                advFillInteriorEl.value = fillMode;
+                advFillSolidGroup.style.display = fillMode === 'solid' ? 'flex' : 'none';
+                advFillGradGroup.style.display = fillMode === 'gradient' ? 'flex' : 'none';
+                advFillColorEl.value = st.style.interiorColor || '#e74c3c';
+                
+                // עדכון בחירת צבעי הגרדיאנט לפי הצורה הנבחרת
+                let gradColorsToSet = st.style.interiorGradColors;
+                if (!gradColorsToSet && st.style.interiorGrad) gradColorsToSet = st.style.interiorGrad; 
+                
+                if(gradColorsToSet && gradColorsToSet.length > 0) {
+                    const container = document.getElementById('adv-fill-gradient-colors');
+                    container.innerHTML = '';
+                    gradColorsToSet.forEach((c, i) => {
+                        const row = document.createElement('div'); row.className = 'grad-color-row';
+                        if (i < 2) row.innerHTML = `<input type="color" class="adv-fill-grad-color" value="${c}">`;
+                        else row.innerHTML = `<input type="color" class="adv-fill-grad-color" value="${c}"><span class="remove-color">X</span>`;
+                        container.appendChild(row);
+                        const inp = row.querySelector('input'); bindAdvGradientInputUndo(inp);
+                        if(i >= 2) {
+                            row.querySelector('.remove-color').addEventListener('click', () => {
+                                row.remove();
+                                selectedIndices.forEach(idx => strokes[idx].style.interiorGradColors = getAdvFillGradientColors());
+                                redrawAll(); updateLayersPanel();
+                            });
+                        }
+                    });
+                    advFillGradAngleEl.value = st.style.interiorGradAngle !== undefined ? st.style.interiorGradAngle : 45;
+                }
+
+            } else {
+                editSmoothingGroup.style.display = 'none';
+                editThicknessGroup.style.display = 'none';
+                editContractionGroup.style.display = 'none';
+            }
+        }
+        effect3DTypeEl.addEventListener('change', (e) => { effect3DSettings.style.display = e.target.value === 'none' ? 'none' : 'flex'; selectedIndices.forEach(idx => strokes[idx].effect3D.type = e.target.value); redrawAll(); });
+        effectAngleEl.addEventListener('input', (e) => { document.getElementById('effect-angle-val').innerText = e.target.value; selectedIndices.forEach(idx => strokes[idx].effect3D.angle = parseInt(e.target.value)); redrawAll(); });
+        effectDepthEl.addEventListener('input', (e) => { document.getElementById('effect-depth-val').innerText = e.target.value; selectedIndices.forEach(idx => strokes[idx].effect3D.depth = parseInt(e.target.value)); redrawAll(); });
+        effectDepthColorModeEl.addEventListener('change', (e) => { document.getElementById('depth-color-custom-group').style.display = e.target.value === 'custom' ? 'flex' : 'none'; document.getElementById('depth-color-auto-group').style.display = e.target.value === 'auto' ? 'flex' : 'none'; selectedIndices.forEach(idx => strokes[idx].effect3D.depthColorMode = e.target.value); redrawAll(); });
+        effectDepthColorEl.addEventListener('input', (e) => { selectedIndices.forEach(idx => strokes[idx].effect3D.depthColor = e.target.value); redrawAll(); });
+        effectDarkenEl.addEventListener('input', (e) => { document.getElementById('effect-darken-val').innerText = e.target.value; selectedIndices.forEach(idx => strokes[idx].effect3D.depthDarken = parseInt(e.target.value)); redrawAll(); });
+        effect3DSymmetryEl.addEventListener('change', (e) => { selectedIndices.forEach(idx => strokes[idx].effect3D.symmetry = e.target.value); redrawAll(); });
+
+        document.getElementById('select-all-btn').addEventListener('click', () => { selectedIndices = strokes.map((_, i) => i); lengthTools.style.display = selectedIndices.length === 1 ? 'flex' : 'none'; update3DUI(); redrawAll(); updateLayersPanel(); });
+        document.getElementById('group-btn').addEventListener('click', () => { if(selectedIndices.length > 1) { let gId = Math.random().toString(36).substring(2); selectedIndices.forEach(i => strokes[i].groupId = gId); redrawAll(); }});
+        document.getElementById('ungroup-btn').addEventListener('click', () => { selectedIndices.forEach(i => delete strokes[i].groupId); redrawAll(); });
+
+        const advancedSidebar = document.getElementById('advanced-sidebar');
+        const mainSidebar = document.getElementById('sidebar');
+
+        document.getElementById('btn-advanced-edit').addEventListener('click', () => { 
+            if (advancedSidebar.style.display === 'flex') {
+                advancedSidebar.style.display = 'none';
+                mainSidebar.style.display = 'flex';
+            } else {
+                mainSidebar.style.display = 'none';
+                advancedSidebar.style.display = 'flex';
+            }
+        });
+        document.getElementById('close-advanced-btn').addEventListener('click', () => { advancedSidebar.style.display = 'none'; mainSidebar.style.display = 'flex'; });
+
+        window.switchAdvTab = function(tab) {
+            document.getElementById('tab-btn-adv-add').classList.remove('active');
+            document.getElementById('tab-btn-adv-edit').classList.remove('active');
+            document.getElementById('panel-adv-add').style.display = 'none';
+            document.getElementById('panel-adv-edit').style.display = 'none';
+            
+            document.getElementById(`tab-btn-adv-${tab}`).classList.add('active');
+            document.getElementById(`panel-adv-${tab}`).style.display = 'flex';
+        };
+
+        const predefinedShapes = [
+            { id: 'line', name: 'קו', icon: 'fa-minus' }, 
+            { id: 'circle', name: 'עיגול', icon: 'fa-circle' },
+            { id: 'triangle', name: 'משולש', icon: 'fa-caret-up' }, 
+            { id: 'square', name: 'מרובע', icon: 'fa-square' },
+            { id: 'pentagon', name: 'מחומש', icon: 'fa-play' },
+            { id: 'hexagon', name: 'משושה', icon: 'fa-stop' },
+            { id: 'octagon', name: 'מתומן', icon: 'fa-certificate' },
+            { id: 'diamond', name: 'מעוין', icon: 'fa-gem' },
+            { id: 'plus', name: 'פלוס', icon: 'fa-plus' },
+            { id: 'arrow', name: 'חץ', icon: 'fa-arrow-right' },
+            { id: 'heart', name: 'לב', icon: 'fa-heart' }, 
+            { id: 'star', name: 'כוכב', icon: 'fa-star' },
+            { id: 'moon', name: 'ירח', icon: 'fa-moon' },
+            { id: 'drop', name: 'טיפה', icon: 'fa-tint' },
+            { id: 'cloud', name: 'ענן', icon: 'fa-cloud' },
+            { id: 'wave', name: 'גל', icon: 'fa-water' },
+            { id: 'spiral', name: 'ספירלה', icon: 'fa-hurricane' },
+            { id: 'zigzag', name: 'זיגזג', icon: 'fa-signature' }
+        ];
+
+        const gallery = document.getElementById('shapes-gallery');
+        predefinedShapes.forEach(shape => {
+            const btn = document.createElement('button'); btn.className = 'shape-btn';
+            btn.innerHTML = `<i class="fas ${shape.icon}"></i> <span>${shape.name}</span>`;
+            btn.addEventListener('click', () => addPredefinedShape(shape.id));
+            gallery.appendChild(btn);
+        });
+
+        function getDenseLine(p1, p2, density = 2) {
+            let pts = []; let dist = Math.hypot(p2.x - p1.x, p2.y - p1.y); let steps = Math.max(1, Math.ceil(dist / density));
+            for(let i=0; i<=steps; i++) pts.push({ x: p1.x + (p2.x - p1.x)*(i/steps), y: p1.y + (p2.y - p1.y)*(i/steps) });
+            return pts;
+        }
+
+        function getPolygon(cx, cy, s, sides, angleOffset=0) {
+            let pts = [];
+            for(let i=0; i<sides; i++) pts.push({x: cx + Math.cos(angleOffset + (i*Math.PI*2)/sides)*s, y: cy + Math.sin(angleOffset + (i*Math.PI*2)/sides)*s});
+            let res = [];
+            for(let i=0; i<sides; i++) res.push(...getDenseLine(pts[i], pts[(i+1)%sides]));
+            return res;
+        }
+
+        function addPredefinedShape(shapeId) {
+            let points = []; let cx = camX; let cy = camY; let s = 50 / zoom; 
+            if (shapeId === 'line') { points = getDenseLine({x: cx - s, y: cy}, {x: cx + s, y: cy}); } 
+            else if (shapeId === 'circle') { for (let i = 0; i <= 360; i+=3) { let a = i * Math.PI / 180; points.push({ x: cx + Math.cos(a)*s, y: cy + Math.sin(a)*s }); } } 
+            else if (shapeId === 'triangle') { points = getPolygon(cx, cy + s/4, s, 3, -Math.PI/2); } 
+            else if (shapeId === 'square') { let p1 = {x: cx - s, y: cy - s}, p2 = {x: cx + s, y: cy - s}, p3 = {x: cx + s, y: cy + s}, p4 = {x: cx - s, y: cy + s}; points = [...getDenseLine(p1, p2), ...getDenseLine(p2, p3), ...getDenseLine(p3, p4), ...getDenseLine(p4, p1)]; } 
+            else if (shapeId === 'pentagon') { points = getPolygon(cx, cy, s, 5, -Math.PI/2); }
+            else if (shapeId === 'hexagon') { points = getPolygon(cx, cy, s, 6, -Math.PI/2); }
+            else if (shapeId === 'octagon') { points = getPolygon(cx, cy, s, 8, -Math.PI/8); }
+            else if (shapeId === 'diamond') { points = getPolygon(cx, cy, s, 4, -Math.PI/2); }
+            else if (shapeId === 'plus') { 
+                let r1 = s/3, r2 = s;
+                let pts = [ {x:cx+r1, y:cy+r1}, {x:cx+r1, y:cy+r2}, {x:cx-r1, y:cy+r2}, {x:cx-r1, y:cy+r1}, {x:cx-r2, y:cy+r1}, {x:cx-r2, y:cy-r1}, {x:cx-r1, y:cy-r1}, {x:cx-r1, y:cy-r2}, {x:cx+r1, y:cy-r2}, {x:cx+r1, y:cy-r1}, {x:cx+r2, y:cy-r1}, {x:cx+r2, y:cy+r1} ];
+                for(let i=0; i<12; i++) points.push(...getDenseLine(pts[i], pts[(i+1)%12]));
+            }
+            else if (shapeId === 'arrow') {
+                let pts = [ {x:cx-s/2, y:cy-s/4}, {x:cx, y:cy-s/4}, {x:cx, y:cy-s/1.5}, {x:cx+s/1.2, y:cy}, {x:cx, y:cy+s/1.5}, {x:cx, y:cy+s/4}, {x:cx-s/2, y:cy+s/4} ];
+                for(let i=0; i<7; i++) points.push(...getDenseLine(pts[i], pts[(i+1)%7]));
+            }
+            else if (shapeId === 'moon') { 
+                for(let a=-Math.PI/2; a<=Math.PI/2; a+=Math.PI/18) points.push({x: cx + Math.cos(a)*s, y: cy + Math.sin(a)*s});
+                for(let a=Math.PI/2; a>=-Math.PI/2; a-=Math.PI/18) points.push({x: cx + Math.cos(a)*s*0.5, y: cy + Math.sin(a)*s});
+            }
+            else if (shapeId === 'drop') {
+                for(let a=0; a<=Math.PI; a+=Math.PI/18) points.push({x: cx + Math.cos(a)*s/2, y: cy + s/4 + Math.sin(a)*s/2});
+                points.push(...getDenseLine({x: cx - s/2, y: cy + s/4}, {x: cx, y: cy - s}));
+                points.push(...getDenseLine({x: cx, y: cy - s}, {x: cx + s/2, y: cy + s/4}));
+            }
+            else if (shapeId === 'cloud') {
+                for(let a=Math.PI; a<=Math.PI*2; a+=Math.PI/18) points.push({x: cx - s/2 + Math.cos(a)*s/3, y: cy + Math.sin(a)*s/3});
+                for(let a=Math.PI; a<=Math.PI*2; a+=Math.PI/18) points.push({x: cx + Math.cos(a)*s/2, y: cy - s/4 + Math.sin(a)*s/2});
+                for(let a=Math.PI; a<=Math.PI*2; a+=Math.PI/18) points.push({x: cx + s/1.5 + Math.cos(a)*s/4, y: cy + s/6 + Math.sin(a)*s/4});
+                points.push(...getDenseLine({x: cx + s/1.5 + s/4, y: cy + s/6}, {x: cx - s/2 - s/3, y: cy}));
+            }
+            else if (shapeId === 'wave') {
+                for(let x=-s*1.5; x<=s*1.5; x+=2) points.push({x: cx+x, y: cy + Math.sin((x/(s*1.5))*Math.PI*2)*(s/2)});
+            }
+            else if (shapeId === 'spiral') {
+                for(let a=0; a<=Math.PI*6; a+=0.1) points.push({x: cx + Math.cos(a)*(a/(Math.PI*6)*s), y: cy + Math.sin(a)*(a/(Math.PI*6)*s)});
+            }
+            else if (shapeId === 'zigzag') { let zPts = []; for (let i = -3; i <= 3; i++) zPts.push({x: cx + i*(s/1.5), y: cy + (i % 2 === 0 ? -s/2 : s/2)}); for (let i = 0; i < zPts.length - 1; i++) points.push(...getDenseLine(zPts[i], zPts[i+1])); } 
+            else if (shapeId === 'heart') { for (let i = 0; i <= 360; i+=3) { let t = i * Math.PI / 180; let hx = 16 * Math.pow(Math.sin(t), 3); let hy = 13 * Math.cos(t) - 5 * Math.cos(2*t) - 2 * Math.cos(3*t) - Math.cos(4*t); points.push({ x: cx + hx * (s/15), y: cy - hy * (s/15) }); } }
+            else if (shapeId === 'star') { let stPts = []; for (let i = 0; i <= 10; i++) { let r = i % 2 === 0 ? s : s/2; let a = (i * 36 - 90) * Math.PI / 180; stPts.push({ x: cx + Math.cos(a)*r, y: cy + Math.sin(a)*r }); } for (let i = 0; i < stPts.length - 1; i++) points.push(...getDenseLine(stPts[i], stPts[i+1])); }
+
+            pushUndo({ type: 'clear', oldStrokes: JSON.parse(JSON.stringify(strokes)) });
+            let newStroke = {
+                points: points,
+                style: { thickness: parseFloat(thicknessEl.value) || 10, contraction: (parseFloat(contractionEl.value) || 5) / 100, penStyle: penStyleEl.value || 'uniform', smoothingLevel: parseInt(smoothingEl.value) || 15, thicknessPeak: 0.5 },
+                effect3D: { type: effect3DTypeEl.value || 'none', angle: parseInt(effectAngleEl.value) || 45, depth: parseInt(effectDepthEl.value) || 10, depthColorMode: effectDepthColorModeEl.value || 'auto', depthColor: effectDepthColorEl.value || '#000', depthDarken: parseInt(effectDarkenEl.value) || 40, symmetry: 'mirror' }
+            };
+            strokes.push(newStroke);
+            
+            setAppMode('edit'); selectedIndices = [strokes.length - 1];
+            lengthTools.style.display = 'flex'; update3DUI(); redrawAll(); updateLayersPanel();
+        }
+
+        document.getElementById('btn-zoom-in').addEventListener('click', () => { zoom *= 1.2; updateCamInfo(); }); document.getElementById('btn-zoom-out').addEventListener('click', () => { zoom /= 1.2; updateCamInfo(); });
+        document.getElementById('btn-rotate-cw').addEventListener('click', () => { angle += 15 * Math.PI / 180; redrawAll(); }); document.getElementById('btn-rotate-ccw').addEventListener('click', () => { angle -= 15 * Math.PI / 180; redrawAll(); });
+        document.getElementById('btn-reset-cam').addEventListener('click', () => { camX = 0; camY = 0; zoom = 1; angle = 0; updateCamInfo(); });
+        function updateCamInfo() { document.getElementById('cam-info').innerText = Math.round(zoom * 100) + '%'; updateCursorSize(); redrawAll(); }
+
+        const performCopy = () => { if (selectedIndices.length > 0) copiedStrokes = selectedIndices.map(i => JSON.parse(JSON.stringify(strokes[i]))); };
+        const performPaste = () => { if (copiedStrokes && copiedStrokes.length > 0) { isDrawing = false; transformAction = null; let newIndices = []; let newGid = copiedStrokes.length > 1 ? Math.random().toString(36).substring(2) : null; copiedStrokes.forEach(s => { let newStroke = JSON.parse(JSON.stringify(s)); if(newGid) newStroke.groupId = newGid; else delete newStroke.groupId; newStroke.points.forEach(p => { p.x += 40/zoom; p.y += 40/zoom; }); strokes.push(newStroke); newIndices.push(strokes.length - 1); }); setAppMode('edit'); selectedIndices = newIndices; lengthTools.style.display = selectedIndices.length === 1 ? 'flex' : 'none'; update3DUI(); updateCursorVisibility(); setTimeout(() => { redrawAll(); updateLayersPanel(); }, 0); } };
+        const performDuplicate = () => { if (selectedIndices.length > 0) { isDrawing = false; transformAction = null; performCopy(); performPaste(); } };
+        const performDelete = () => { if (appMode.includes('edit') && selectedIndices.length > 0) { pushUndo({ type: 'delete', items: selectedIndices.map(i => ({idx: i, stroke: strokes[i]})) }); selectedIndices.sort((a,b)=>b-a).forEach(i => strokes.splice(i, 1)); selectedIndices = []; lengthTools.style.display = 'none'; redrawAll(); updateLayersPanel(); } };
+
+        document.getElementById('save-project-btn').addEventListener('click', () => {
+            const projectData = { strokes: strokes, undoStack: undoStack, redoStack: redoStack, camX: camX, camY: camY, zoom: zoom, angle: angle, gradientColors: getGradientColors(), patternImageSrc: patternImage ? patternImage.src : null };
+            const link = document.createElement("a"); link.href = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(projectData)); link.download = "Eitoran_Project.json"; link.click();
+        });
+
+        document.getElementById('import-project-btn').addEventListener('click', () => document.getElementById('project-upload').click());
+        document.getElementById('project-upload').addEventListener('change', (e) => {
+            const file = e.target.files[0]; if (!file) return; 
+            
+            if (!isSafeFileName(file.name)) {
+                alert('שם הקובץ אינו חוקי. יש להעלות קבצים בעלי שם ללא סימנים מיוחדים.');
+                e.target.value = ''; return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                try {
+                    const pd = JSON.parse(event.target.result);
+                    strokes = pd.strokes || []; undoStack = pd.undoStack || []; redoStack = pd.redoStack || [];
+                    camX = pd.camX || 0; camY = pd.camY || 0; zoom = pd.zoom || 1; angle = pd.angle || 0;
+                    if (pd.gradientColors) setGradientColors(pd.gradientColors);
+                    selectedIndices = []; lengthTools.style.display = 'none';
+                    if (pd.patternImageSrc) { const img = new Image(); img.onload = () => { patternImage = img; updateCamInfo(); redrawAll(); }; img.src = pd.patternImageSrc; } 
+                    else { patternImage = null; updateCamInfo(); redrawAll(); }
+                } catch (err) { alert("שגיאה בטעינת קובץ הפרויקט."); }
+            }; reader.readAsText(file); e.target.value = '';
+        });
+
+        function processSvgString(svgString) {
+            const parser = new DOMParser(); const doc = parser.parseFromString(svgString, "image/svg+xml");
+            const paths = doc.querySelectorAll('path'); const svgNS = "http://www.w3.org/2000/svg";
+            let tempSvg = document.createElementNS(svgNS, 'svg'); document.body.appendChild(tempSvg);
+
+            paths.forEach(path => {
+                tempSvg.appendChild(path.cloneNode(true));
+                try {
+                    const length = path.getTotalLength(); let points = [];
+                    for(let i=0; i<=length; i+=5) points.push({x: path.getPointAtLength(i).x, y: path.getPointAtLength(i).y});
+                    if(points.length > 1) {
+                        let isDuplicate = strokes.some(existing => {
+                            if(existing.points.length !== points.length) return false;
+                            let last = points.length-1;
+                            return (Math.abs(existing.points[0].x - points[0].x) < 2 && Math.abs(existing.points[0].y - points[0].y) < 2) &&
+                                   (Math.abs(existing.points[last].x - points[last].x) < 2 && Math.abs(existing.points[last].y - points[last].y) < 2);
+                        });
+                        if(!isDuplicate) { strokes.push({ points: points, style: { thickness: 5, contraction: 0, penStyle: 'uniform', smoothingLevel: 10, thicknessPeak: 0.5 }, effect3D: { type: 'none', angle: 45, depth: 10, depthColorMode: 'auto', depthColor: '#000', depthDarken: 40, symmetry: 'mirror' } }); }
+                    }
+                } catch(err) {} tempSvg.innerHTML = ''; 
+            });
+            document.body.removeChild(tempSvg); redrawAll(); updateLayersPanel();
+        }
+
+        document.getElementById('import-svg-btn').addEventListener('click', () => document.getElementById('svg-upload').click());
+        document.getElementById('svg-upload').addEventListener('change', (e) => {
+            const file = e.target.files[0]; if (!file) return; 
+
+            if (!isSafeFileName(file.name)) {
+                alert('שם הקובץ אינו חוקי. יש להעלות קבצים בעלי שם ללא סימנים מיוחדים.');
+                e.target.value = ''; return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = (event) => { processSvgString(event.target.result); }; reader.readAsText(file); e.target.value = '';
+        });
+
+        document.getElementById('duplicate-btn').addEventListener('click', performDuplicate); document.getElementById('delete-btn').addEventListener('click', performDelete); 
+        document.getElementById('undo-btn').addEventListener('click', performUndo); document.getElementById('redo-btn').addEventListener('click', performRedo);
+        document.getElementById('clear-btn').addEventListener('click', () => { pushUndo({ type: 'clear', oldStrokes: [...strokes] }); strokes = []; selectedIndices = []; lengthTools.style.display = 'none'; redrawAll(); updateLayersPanel(); });
+
+        document.getElementById('flatten-btn').addEventListener('click', () => {
+            if (symmetryModeEl.value === 'none') return;
+            
+            let newStrokes = [];
+            let symMode = symmetryModeEl.value;
+            
+            let globalMinX = Infinity, globalMaxX = -Infinity;
+            if (strokes.length > 0) { 
+                strokes.forEach(stroke => { 
+                    if (stroke.points.length < 2) return; 
+                    const smoothed = smoothPath(stroke.points, stroke.style.smoothingLevel);
+                    if(stroke.style.penStyle === 'image_brush') { 
+                        smoothed.forEach(p => { 
+                            globalMinX = Math.min(globalMinX, p.x - stroke.style.thickness/2); 
+                            globalMaxX = Math.max(globalMaxX, p.x + stroke.style.thickness/2); 
+                        });
+                    } else {
+                        const poly = generateEnvelopePolygon(smoothed, stroke.style);
+                        poly.forEach(p => { globalMinX = Math.min(globalMinX, p.x); globalMaxX = Math.max(globalMaxX, p.x); }); 
+                    }
+                }); 
+            } else { globalMinX = 0; globalMaxX = 0; }
+            
+            let shapeW = globalMaxX - globalMinX || 1;
+            let symOffsetShift = -(parseFloat(symOffsetEl.value) / 100) * shapeW;
+
+            strokes.forEach(stroke => {
+                newStrokes.push(JSON.parse(JSON.stringify(stroke)));
+
+                if (symMode.startsWith('radial_')) {
+                    const parts = parseInt(symMode.split('_')[1]);
+                    for (let i = 1; i < parts; i++) {
+                        let angle = (Math.PI * 2 * i) / parts;
+                        let mirroredStroke = JSON.parse(JSON.stringify(stroke));
+                        mirroredStroke.points = mirroredStroke.points.map(p => ({
+                            x: p.x * Math.cos(angle) - p.y * Math.sin(angle),
+                            y: p.x * Math.sin(angle) + p.y * Math.cos(angle)
+                        }));
+                        newStrokes.push(mirroredStroke);
+                    }
+                } else if (symMode === 'mirror_right') {
+                    let mirroredStroke = JSON.parse(JSON.stringify(stroke));
+                    mirroredStroke.points = mirroredStroke.points.map(p => ({ x: 2 * globalMaxX - p.x + symOffsetShift, y: p.y })).reverse();
+                    newStrokes.push(mirroredStroke);
+                } else if (symMode === 'mirror_left') {
+                    let mirroredStroke = JSON.parse(JSON.stringify(stroke));
+                    mirroredStroke.points = mirroredStroke.points.map(p => ({ x: 2 * globalMinX - p.x - symOffsetShift, y: p.y })).reverse();
+                    newStrokes.push(mirroredStroke);
+                }
+            });
+
+            pushUndo({ type: 'clear', oldStrokes: [...strokes] }); 
+            strokes = newStrokes;
+            symmetryModeEl.value = 'none'; 
+            document.getElementById('sym-offset-group').style.display = 'none'; 
+            
+            selectedIndices = [];
+            redrawAll();
+            updateLayersPanel();
+        });
+        
+        document.addEventListener('keydown', (e) => {
+            if (e.code === 'Space' && !spacePressed) { spacePressed = true; updateCursorVisibility(); }
+            const activeTag = document.activeElement.tagName; if (activeTag === 'INPUT' || activeTag === 'SELECT') return;
+            const ctrl = e.ctrlKey || e.metaKey;
+            
+            if (ctrl && e.code === 'KeyZ' && !e.shiftKey) { e.preventDefault(); performUndo(); } 
+            if ((ctrl && e.code === 'KeyY') || (ctrl && e.shiftKey && e.code === 'KeyZ')) { e.preventDefault(); performRedo(); }
+            if (ctrl && e.code === 'KeyD') { e.preventDefault(); performDuplicate(); } 
+            if (ctrl && e.code === 'KeyC') { e.preventDefault(); performCopy(); } 
+            if (ctrl && e.code === 'KeyV') { e.preventDefault(); performPaste(); }
+            
+            if (ctrl && e.code === 'KeyG') { e.preventDefault(); if (e.shiftKey) { document.getElementById('ungroup-btn').click(); } else { document.getElementById('group-btn').click(); } }
+            if (ctrl && e.code === 'KeyA') { e.preventDefault(); document.getElementById('select-all-btn').click(); }
+            
+            if (e.code === 'Delete' || e.code === 'Backspace') { e.preventDefault(); performDelete(); }
+        });
+        document.addEventListener('keyup', (e) => { if (e.code === 'Space') { spacePressed = false; updateCursorVisibility(); } });
+
+        function screenToWorld(clientX, clientY) { if (!canvasRect) return {x:0, y:0}; const sx = (clientX - canvasRect.left) - logicalWidth / 2; const sy = (clientY - canvasRect.top) - logicalHeight / 2; const rx = sx * Math.cos(-angle) - sy * Math.sin(-angle); const ry = sx * Math.sin(-angle) + sy * Math.cos(-angle); return { x: rx / zoom + camX, y: ry / zoom + camY }; }
+        function updateCursorVisibility() { if (spacePressed || appMode === 'pan' || appMode === 'bucket') { container.style.cursor = appMode === 'bucket' ? 'crosshair' : 'grab'; cursor.style.display = 'none'; } else if (appMode === 'draw') { container.style.cursor = 'none'; cursor.style.display = 'block'; } else { container.style.cursor = 'default'; cursor.style.display = 'none'; } }
+        function updateCursorSize() { if (appMode !== 'draw') return; cursor.style.width = (thicknessEl.value * zoom) + 'px'; cursor.style.height = (thicknessEl.value * zoom) + 'px'; }
+
+        container.addEventListener('pointermove', (e) => { if (appMode === 'draw' && !spacePressed && canvasRect) { cursor.style.left = (e.clientX - canvasRect.left) + 'px'; cursor.style.top = (e.clientY - canvasRect.top) + 'px'; } }); 
+        container.addEventListener('pointerenter', updateCursorVisibility); 
+        container.addEventListener('pointerleave', () => cursor.style.display = 'none');
+
+        // --- אלגוריתם מילוי דלי צבע חכם ---
+        function getBucketFillPolygon(screenX, screenY) {
+            tempCtx.clearRect(0, 0, tempCanvas.width, tempCanvas.height);
+            tempCtx.save();
+            tempCtx.translate(logicalWidth / 2, logicalHeight / 2);
+            tempCtx.rotate(angle); tempCtx.scale(zoom, zoom); tempCtx.translate(-camX, -camY);
+
+            // צייר רק את הקווים כשחור אטום לטובת סריקת הגבולות
+            strokes.forEach(stroke => {
+                if (stroke.points.length < 2) return;
+                let sm = smoothPath(stroke.points, stroke.style.smoothingLevel);
+                if (stroke.style.penStyle === 'image_brush') return; // לא נתמך במילוי חכם
+                let poly = generateEnvelopePolygon(sm, stroke.style);
+                tempCtx.fillStyle = '#000';
+                drawPolygonsCombined(tempCtx, [poly]);
+            });
+            tempCtx.restore();
+
+            let dpr = window.devicePixelRatio || 1;
+            let pxX = Math.round(screenX * dpr);
+            let pxY = Math.round(screenY * dpr);
+            let w = tempCanvas.width;
+            let h = tempCanvas.height;
+
+            if(pxX < 0 || pxX >= w || pxY < 0 || pxY >= h) return null;
+
+            let imgData = tempCtx.getImageData(0, 0, w, h);
+            let data = imgData.data;
+
+            let startIdx = (pxY * w + pxX) * 4;
+            if (data[startIdx+3] > 128) return null; // נלחץ על קו קיים
+
+            // הצפה (Flood Fill) למציאת חלל סגור
+            let mask = new Uint8Array(w * h);
+            let stackX = [pxX], stackY = [pxY];
+            let touchesEdge = false;
+
+            while(stackX.length > 0) {
+                let cx = stackX.pop();
+                let cy = stackY.pop();
+                let idx = cy * w + cx;
+
+                if (mask[idx] === 1) continue;
+                mask[idx] = 1;
+
+                if (cx === 0 || cx === w - 1 || cy === 0 || cy === h - 1) {
+                    touchesEdge = true;
+                }
+
+                let neighbors = [[cx+1, cy], [cx-1, cy], [cx, cy+1], [cx, cy-1]];
+                for (let n of neighbors) {
+                    let nx = n[0], ny = n[1];
+                    if (nx>=0 && nx<w && ny>=0 && ny<h) {
+                        let nIdx = ny * w + nx;
+                        if (mask[nIdx] === 0 && data[nIdx*4+3] < 128) {
+                            stackX.push(nx);
+                            stackY.push(ny);
+                        }
+                    }
+                }
+            }
+
+            if (touchesEdge) return false; // החלל נשפך מחוץ למסך, לא סגור.
+
+            // עקיבת מסלול הקווים הויקטורים (Moore Neighborhood)
+            let startTrace = null;
+            for (let y = 0; y < h; y++) {
+                for (let x = 0; x < w; x++) {
+                    if (mask[y * w + x] === 1) { startTrace = {x, y}; break; }
+                }
+                if (startTrace) break;
+            }
+
+            if (!startTrace) return null;
+
+            let boundary = [];
+            let curr = {x: startTrace.x, y: startTrace.y};
+            let backtrace = 7;
+            let dirs = [ [1,0], [1,1], [0,1], [-1,1], [-1,0], [-1,-1], [0,-1], [1,-1] ];
+
+            let loopCount = 0;
+            do {
+                boundary.push({x: curr.x, y: curr.y});
+                let found = false;
+                let startDir = (backtrace + 2) % 8;
+                for (let i = 0; i < 8; i++) {
+                    let dir = (startDir + i) % 8;
+                    let nx = curr.x + dirs[dir][0];
+                    let ny = curr.y + dirs[dir][1];
+                    if (nx >= 0 && nx < w && ny >= 0 && ny < h && mask[ny * w + nx] === 1) {
+                        curr = {x: nx, y: ny};
+                        backtrace = (dir + 4) % 8;
+                        found = true; break;
+                    }
+                }
+                if (!found) break; 
+                loopCount++;
+            } while ((curr.x !== startTrace.x || curr.y !== startTrace.y) && loopCount < w*h);
+
+            // דילול נקודות לאופטימיזציה
+            let simplified = [];
+            for(let i=0; i<boundary.length; i+=4) simplified.push(boundary[i]);
+            if(simplified.length < 3) return null;
+
+            // המרה חזרה לקואורדינטות קנבס עולמיות
+            let worldPoints = simplified.map(p => {
+                const sx = (p.x / dpr) - logicalWidth / 2;
+                const sy = (p.y / dpr) - logicalHeight / 2;
+                const rx = sx * Math.cos(-angle) - sy * Math.sin(-angle);
+                const ry = sx * Math.sin(-angle) + sy * Math.cos(-angle);
+                return { x: rx / zoom + camX, y: ry / zoom + camY };
+            });
+
+            return smoothPath(worldPoints, 1);
+        }
+
+        function subdivide(points, maxDist) { if (points.length < 2) return points; let res = [points[0]]; for (let i = 1; i < points.length; i++) { let p1 = points[i-1], p2 = points[i], dist = Math.hypot(p2.x - p1.x, p2.y - p1.y); let steps = Math.max(1, Math.ceil(dist / maxDist)); for (let j = 1; j <= steps; j++) res.push({ x: p1.x + (p2.x-p1.x)*j/steps, y: p1.y + (p2.y-p1.y)*j/steps }); } return res; }
+        function smoothPath(points, intensity) { if (points.length < 3 || intensity === 0) return subdivide(points, 2); let result = [...points], passes = intensity * 4; for (let p = 0; p < passes; p++) { let temp = [result[0]]; for (let i = 1; i < result.length - 1; i++) temp.push({ x: result[i-1].x * 0.25 + result[i].x * 0.5 + result[i+1].x * 0.25, y: result[i-1].y * 0.25 + result[i].y * 0.5 + result[i+1].y * 0.25 }); temp.push(result[result.length - 1]); result = temp; } return subdivide(result, 2); }
+        function getMultiStrokeBounds(indices) { let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity; indices.forEach(idx => strokes[idx].points.forEach(p => { minX = Math.min(minX, p.x); minY = Math.min(minY, p.y); maxX = Math.max(maxX, p.x); maxY = Math.max(maxY, p.y); })); return { minX: minX-15, minY: minY-15, maxX: maxX+15, maxY: maxY+15 }; }
+
+        let oldThicknessPeak = null;
+
+        canvas.addEventListener('pointerdown', (e) => {
+            if (spacePressed || appMode === 'pan' || appMode === 'project') { isPanning = true; panStartMouse = { x: e.clientX, y: e.clientY }; panStartCam = { x: camX, y: camY }; container.style.cursor = 'grabbing'; return; }
+            const pos = screenToWorld(e.clientX, e.clientY);
+            
+            if (appMode === 'bucket') {
+                const screenX = Math.round(e.clientX - canvasRect.left);
+                const screenY = Math.round(e.clientY - canvasRect.top);
+                let polyPoints = getBucketFillPolygon(screenX, screenY);
+                
+                if (polyPoints === false) {
+                    alert('השטח אינו סגור מכל צדדיו! (ודא שאין חורים ושהצורה כולה מוצגת על המסך)');
+                } else if (polyPoints === null) {
+                    // לחץ על קו, לא עושה כלום
+                } else {
+                    let newStroke = {
+                        points: polyPoints,
+                        style: {
+                            thickness: 0, contraction: 0, penStyle: 'uniform', smoothingLevel: 5, thicknessPeak: 0.5,
+                            fillInteriorType: advFillInteriorEl.value,
+                            interiorColor: advFillColorEl.value,
+                            interiorGradColors: getAdvFillGradientColors(),
+                            interiorGradAngle: parseFloat(advFillGradAngleEl.value) || 45,
+                            advStrokeMode: 'custom_solid', customColor: 'rgba(0,0,0,0)' // ללא מסגרת דקה
+                        },
+                        effect3D: { type: 'none', angle: 45, depth: 10, depthColorMode: 'auto', depthColor: '#000', depthDarken: 40, symmetry: 'none' }
+                    };
+                    
+                    pushUndo({ type: 'draw' });
+                    strokes.push(newStroke);
+                    setAppMode('edit'); 
+                    selectedIndices = [strokes.length - 1]; 
+                    update3DUI();
+                    updateLayersPanel(); 
+                    redrawAll();
+                }
+                return;
+            }
+
+            if (appMode === 'draw') {
+                isDrawing = true;
+                currentActiveStroke = { 
+                    points: [pos], 
+                    style: { 
+                        thickness: parseFloat(thicknessEl.value), 
+                        contraction: parseFloat(contractionEl.value) / 100, 
+                        penStyle: penStyleEl.value, 
+                        smoothingLevel: parseInt(smoothingEl.value), 
+                        thicknessPeak: 0.5, 
+                        brushSrc: (penStyleEl.value === 'image_brush' && globalBrushImage) ? globalBrushImage.src : null,
+                        brushColorMode: document.getElementById('brush-color-mode') ? document.getElementById('brush-color-mode').value : 'original'
+                    }, 
+                    effect3D: { type: effect3DTypeEl.value, angle: parseInt(effectAngleEl.value), depth: parseInt(effectDepthEl.value), depthColorMode: effectDepthColorModeEl.value, depthColor: effectDepthColorEl.value, depthDarken: parseInt(effectDarkenEl.value), symmetry: effect3DSymmetryEl.value } 
+                };
+            } 
+            else if (appMode.includes('edit') || appMode === 'lengthen' || appMode === 'shorten') {
+                transformAction = null;
+                if (selectedIndices.length > 0) {
+                    const bounds = getMultiStrokeBounds(selectedIndices), handleSize = 16 / zoom; 
+                    const hitHandle = (px, py) => Math.hypot(pos.x - px, pos.y - py) < handleSize * 1.5;
+                    if ((appMode === 'lengthen' || appMode === 'shorten') && selectedIndices.length === 1) { const pts = strokes[selectedIndices[0]].points; if (hitHandle(pts[0].x, pts[0].y)) transformAction = 'edge-start'; else if (hitHandle(pts[pts.length-1].x, pts[pts.length-1].y)) transformAction = 'edge-end'; } 
+                    else if (appMode === 'edit-thickness' && selectedIndices.length === 1) { const stroke = strokes[selectedIndices[0]]; const pts = stroke.points; const peakIdx = Math.floor(stroke.style.thicknessPeak * (pts.length - 1)); if(pts[peakIdx] && hitHandle(pts[peakIdx].x, pts[peakIdx].y)) { transformAction = 'edit-thickness'; oldThicknessPeak = stroke.style.thicknessPeak; } }
+                    if (!transformAction && appMode === 'edit') { const midX = (bounds.minX + bounds.maxX) / 2, rotHandleY = bounds.minY - 40/zoom; if (hitHandle(midX, rotHandleY)) transformAction = 'rotate'; else if (hitHandle(bounds.minX, bounds.minY)) transformAction = 'scaleTL'; else if (hitHandle(bounds.maxX, bounds.minY)) transformAction = 'scaleTR'; else if (hitHandle(bounds.minX, bounds.maxY)) transformAction = 'scaleBL'; else if (hitHandle(bounds.maxX, bounds.maxY)) transformAction = 'scaleBR'; else if (pos.x > bounds.minX && pos.x < bounds.maxX && pos.y > bounds.minY && pos.y < bounds.maxY) transformAction = 'move'; }
+                }
+
+                if (!transformAction && !appMode.includes('lengthen') && !appMode.includes('shorten') && appMode !== 'edit-thickness') {
+                    let hitIdx = -1; for (let i = strokes.length - 1; i >= 0; i--) { let b = getMultiStrokeBounds([i]); if (pos.x > b.minX && pos.x < b.maxX && pos.y > b.minY && pos.y < b.maxY) { hitIdx = i; break; } }
+                    if (hitIdx !== -1) {
+                        if (e.ctrlKey || e.metaKey) { 
+                            let itemsToToggle = strokes[hitIdx].groupId ? strokes.map((s, idx) => s.groupId === strokes[hitIdx].groupId ? idx : -1).filter(idx => idx !== -1) : [hitIdx];
+                            let allSelected = itemsToToggle.every(idx => selectedIndices.includes(idx));
+                            if (allSelected) { selectedIndices = selectedIndices.filter(idx => !itemsToToggle.includes(idx)); } 
+                            else { itemsToToggle.forEach(idx => { if(!selectedIndices.includes(idx)) selectedIndices.push(idx); }); }
+                        }
+                        else if (!selectedIndices.includes(hitIdx)) { 
+                            if (strokes[hitIdx].groupId) { let gid = strokes[hitIdx].groupId; selectedIndices = strokes.map((s, idx) => s.groupId === gid ? idx : -1).filter(idx => idx !== -1); } 
+                            else selectedIndices = [hitIdx]; 
+                        }
+                        transformAction = 'move'; lengthTools.style.display = selectedIndices.length === 1 ? 'flex' : 'none'; update3DUI(); updateLayersPanel();
+                    } else { 
+                        if (appMode === 'edit') {
+                            isMarqueeSelecting = true;
+                            marqueeStart = pos;
+                            marqueeEnd = pos;
+                            if (!e.ctrlKey && !e.metaKey) selectedIndices = []; 
+                            lengthTools.style.display = 'none';
+                            updateLayersPanel();
+                        } else {
+                            selectedIndices = []; lengthTools.style.display = 'none'; updateLayersPanel(); 
+                        }
+                    }
+                }
+
+                if (transformAction && selectedIndices.length > 0) {
+                    isDrawing = true; transformStartMouse = pos;
+                    originalStrokesData = selectedIndices.map(idx => ({ idx: idx, points: strokes[idx].points.map(p => ({...p})) })); originalBounds = getMultiStrokeBounds(selectedIndices); 
+                    const unselectedIndices = strokes.map((_, i) => i).filter(i => !selectedIndices.includes(i)); redrawAll(false, ctx, unselectedIndices);
+                } else { redrawAll(); }
+            }
+        });
+
+        canvas.addEventListener('pointermove', (e) => {
+            if (isPanning) { let dx = (e.clientX - panStartMouse.x) / zoom, dy = (e.clientY - panStartMouse.y) / zoom; camX = panStartCam.x - (dx * Math.cos(-angle) - dy * Math.sin(-angle)); camY = panStartCam.y - (dx * Math.sin(-angle) + dy * Math.cos(-angle)); redrawAll(); return; }
+            const pos = screenToWorld(e.clientX, e.clientY);
+            
+            if (isMarqueeSelecting) {
+                marqueeEnd = pos;
+                redrawAll();
+                tempCtx.save();
+                tempCtx.translate(logicalWidth / 2, logicalHeight / 2); tempCtx.rotate(angle); tempCtx.scale(zoom, zoom); tempCtx.translate(-camX, -camY);
+                tempCtx.strokeStyle = 'rgba(212, 175, 55, 0.8)';
+                tempCtx.fillStyle = 'rgba(212, 175, 55, 0.2)';
+                tempCtx.lineWidth = 1 / zoom;
+                let rx = Math.min(marqueeStart.x, marqueeEnd.x);
+                let ry = Math.min(marqueeStart.y, marqueeEnd.y);
+                let rw = Math.abs(marqueeEnd.x - marqueeStart.x);
+                let rh = Math.abs(marqueeEnd.y - marqueeStart.y);
+                tempCtx.fillRect(rx, ry, rw, rh);
+                tempCtx.strokeRect(rx, ry, rw, rh);
+                tempCtx.restore();
+                return;
+            }
+
+            if (appMode === 'draw' && isDrawing && !spacePressed && currentActiveStroke) { if (Math.hypot(pos.x - currentActiveStroke.points[currentActiveStroke.points.length-1].x, pos.y - currentActiveStroke.points[currentActiveStroke.points.length-1].y) > 2 / zoom) { currentActiveStroke.points.push(pos); drawTempStroke(); } } 
+            else if (isDrawing && selectedIndices.length > 0) {
+                const dx = pos.x - transformStartMouse.x, dy = pos.y - transformStartMouse.y;
+                if (appMode === 'lengthen' || appMode === 'shorten') { const stroke = strokes[selectedIndices[0]]; const origPts = originalStrokesData[0].points; if (appMode === 'lengthen') { if (transformAction === 'edge-end' && Math.hypot(pos.x - stroke.points[stroke.points.length-1].x, pos.y - stroke.points[stroke.points.length-1].y) > 2/zoom) stroke.points.push(pos); else if (transformAction === 'edge-start' && Math.hypot(pos.x - stroke.points[0].x, pos.y - stroke.points[0].y) > 2/zoom) stroke.points.unshift(pos); } else if (appMode === 'shorten') { let closestIdx = 0, minDist = Infinity; for(let i = 0; i < origPts.length; i++) { let d = Math.hypot(pos.x - origPts[i].x, pos.y - origPts[i].y); if (d < minDist) { minDist = d; closestIdx = i; } } if (transformAction === 'edge-end' && closestIdx >= 1) stroke.points = origPts.slice(0, closestIdx + 1); else if (transformAction === 'edge-start' && closestIdx <= origPts.length - 2) stroke.points = origPts.slice(closestIdx); } } 
+                else if (appMode === 'edit-thickness' && transformAction === 'edit-thickness') { const stroke = strokes[selectedIndices[0]]; let closestIdx = 0, minDist = Infinity; for(let i = 0; i < stroke.points.length; i++) { let d = Math.hypot(pos.x - stroke.points[i].x, pos.y - stroke.points[i].y); if(d < minDist) { minDist = d; closestIdx = i; } } let newPeak = closestIdx / (stroke.points.length - 1); stroke.style.thicknessPeak = Math.max(0.05, Math.min(0.95, newPeak)); }
+                else if (appMode === 'edit') { const w = originalBounds.maxX - originalBounds.minX, h = originalBounds.maxY - originalBounds.minY, cx = (originalBounds.minX + originalBounds.maxX) / 2, cy = (originalBounds.minY + originalBounds.maxY) / 2; let scaleX = 1, scaleY = 1, originX = originalBounds.minX, originY = originalBounds.minY, diffAngle = 0; if (transformAction === 'rotate') diffAngle = Math.atan2(pos.y - cy, pos.x - cx) - Math.atan2(transformStartMouse.y - cy, transformStartMouse.x - cx); else if (transformAction === 'scaleBR') { scaleX = (w + dx) / w; scaleY = (h + dy) / h; } else if (transformAction === 'scaleTL') { scaleX = (w - dx) / w; scaleY = (h - dy) / h; originX = originalBounds.maxX; originY = originalBounds.maxY; } else if (transformAction === 'scaleTR') { scaleX = (w + dx) / w; scaleY = (h - dy) / h; originX = originalBounds.minX; originY = originalBounds.maxY; } else if (transformAction === 'scaleBL') { scaleX = (w - dx) / w; scaleY = (h + dy) / h; originX = originalBounds.maxX; originY = originalBounds.minY; } if (transformAction && transformAction.includes('scale')) { if (scaleX === 0) scaleX = 0.001; if (scaleY === 0) scaleY = 0.001; } originalStrokesData.forEach(data => { strokes[data.idx].points = data.points.map(p => { if (transformAction === 'move') return { x: p.x + dx, y: p.y + dy }; if (transformAction === 'rotate') return { x: cx + (p.x - cx) * Math.cos(diffAngle) - (p.y - cy) * Math.sin(diffAngle), y: cy + (p.x - cx) * Math.sin(diffAngle) + (p.y - cy) * Math.cos(diffAngle) }; return { x: originX + (p.x - originX) * scaleX, y: originY + (p.y - originY) * scaleY }; }); }); }
+                redrawAll(false, tempCtx, selectedIndices);
+            }
+            
+            if (appMode === 'edit' && !isDrawing && selectedIndices.length > 0) { const b = getMultiStrokeBounds(selectedIndices), hit = 12 / zoom, midX = (b.minX + b.maxX) / 2, rotHandleY = b.minY - 40/zoom; if (Math.hypot(pos.x - midX, pos.y - rotHandleY) < hit*1.5) container.style.cursor = 'grab'; else if (Math.hypot(pos.x - b.minX, pos.y - b.minY) < hit || Math.hypot(pos.x - b.maxX, pos.y - b.maxY) < hit) container.style.cursor = 'nwse-resize'; else if (Math.hypot(pos.x - b.maxX, pos.y - b.minY) < hit || Math.hypot(pos.x - b.minX, pos.y - b.maxY) < hit) container.style.cursor = 'nesw-resize'; else if (pos.x > b.minX && pos.x < b.maxX && pos.y > b.minY && pos.y < b.maxY) container.style.cursor = 'move'; else container.style.cursor = 'default'; }
+            else if ((appMode === 'lengthen' || appMode === 'shorten') && !isDrawing && selectedIndices.length === 1) { const pts = strokes[selectedIndices[0]].points, hit = 16 / zoom; if(pts.length >= 2 && (Math.hypot(pos.x - pts[0].x, pos.y - pts[0].y) < hit*1.5 || Math.hypot(pos.x - pts[pts.length-1].x, pos.y - pts[pts.length-1].y) < hit*1.5)) container.style.cursor = 'crosshair'; else container.style.cursor = 'default'; }
+            else if (appMode === 'edit-thickness' && !isDrawing && selectedIndices.length === 1) { const st = strokes[selectedIndices[0]], pts = st.points, pk = Math.floor(st.style.thicknessPeak*(pts.length-1)), hit = 16/zoom; if(pts[pk] && Math.hypot(pos.x - pts[pk].x, pos.y - pts[pk].y)<hit*1.5) container.style.cursor = 'ew-resize'; else container.style.cursor = 'default';}
+        });
+
+        const stopAction = (e) => { 
+            isPanning = false; updateCursorVisibility();
+
+            if (isMarqueeSelecting) {
+                isMarqueeSelecting = false;
+                let minX = Math.min(marqueeStart.x, marqueeEnd.x);
+                let maxX = Math.max(marqueeStart.x, marqueeEnd.x);
+                let minY = Math.min(marqueeStart.y, marqueeEnd.y);
+                let maxY = Math.max(marqueeStart.y, marqueeEnd.y);
+
+                let newSelection = [];
+                strokes.forEach((stroke, i) => {
+                    let b = getMultiStrokeBounds([i]);
+                    if (b.minX < maxX && b.maxX > minX && b.minY < maxY && b.maxY > minY) {
+                        newSelection.push(i);
+                    }
+                });
+
+                let groupsToSelect = new Set();
+                newSelection.forEach(i => { if (strokes[i].groupId) groupsToSelect.add(strokes[i].groupId); });
+                strokes.forEach((s, i) => { if (s.groupId && groupsToSelect.has(s.groupId) && !newSelection.includes(i)) newSelection.push(i); });
+
+                if (e && (e.ctrlKey || e.metaKey)) {
+                    newSelection.forEach(i => { if (!selectedIndices.includes(i)) selectedIndices.push(i); });
+                } else {
+                    selectedIndices = newSelection;
+                }
+
+                marqueeStart = null; marqueeEnd = null;
+                lengthTools.style.display = selectedIndices.length === 1 ? 'flex' : 'none';
+                update3DUI();
+                updateLayersPanel();
+                tempCtx.clearRect(0, 0, tempCanvas.width, tempCanvas.height);
+                redrawAll();
+                return; 
+            }
+
+            if (isDrawing && appMode === 'draw' && !spacePressed && e && e.clientX !== undefined && currentActiveStroke) currentActiveStroke.points.push(screenToWorld(e.clientX, e.clientY));
+            if (isDrawing) { 
+                if (appMode === 'draw' && currentActiveStroke) { strokes.push(currentActiveStroke); pushUndo({ type: 'draw' }); currentActiveStroke = null; updateLayersPanel(); }
+                if (transformAction && appMode !== 'draw') { 
+                    if(transformAction === 'edit-thickness') { pushUndo({ type: 'edit_style', changes: [{idx: selectedIndices[0], oldSmooth: strokes[selectedIndices[0]].style.smoothingLevel, newSmooth: strokes[selectedIndices[0]].style.smoothingLevel, oldPeak: oldThicknessPeak, newPeak: strokes[selectedIndices[0]].style.thicknessPeak }]}); updateLayersPanel(); }
+                    else { let changes = originalStrokesData.map(data => ({ idx: data.idx, oldPoints: data.points, newPoints: strokes[data.idx].points.map(p=>({...p})) })); pushUndo({ type: 'transform', changes: changes }); updateLayersPanel(); }
+                }
+                isDrawing = false; transformAction = null; originalStrokesData = []; oldThicknessPeak = null; tempCtx.clearRect(0, 0, tempCanvas.width, tempCanvas.height); redrawAll(); 
+            } 
+        };
+        
+        document.addEventListener('pointerup', stopAction); 
+        document.addEventListener('pointerleave', stopAction);
+        document.addEventListener('pointercancel', stopAction); 
+
+        function getStrokeWidth(index, total, style, dx, dy) {
+            const maxW = style.thickness, minW = maxW * style.contraction, progress = total > 1 ? index / (total - 1) : 0;
+            if (style.penStyle === 'uniform' || style.penStyle === 'image_brush') return maxW;
+            if (style.penStyle === 'tapered') return maxW - (maxW - minW) * progress;
+            if (style.penStyle === 'double_tapered') { let peak = style.thicknessPeak !== undefined ? style.thicknessPeak : 0.5; let mappedP = progress < peak ? (progress / peak) * 0.5 : 0.5 + ((progress - peak) / (1 - peak)) * 0.5; return minW + (maxW - minW) * Math.sin(mappedP * Math.PI); }
+            const len = Math.hypot(dx, dy) || 1; if (style.penStyle === 'thin_horizontal') return minW + (maxW - minW) * Math.abs(dy / len); if (style.penStyle === 'thin_vertical') return minW + (maxW - minW) * Math.abs(dx / len); return maxW;
+        }
+
+        function smoothEdge(pts, iterations) { if(pts.length < 3) return pts; let res = pts; for(let k=0; k<iterations; k++){ let temp = [res[0]]; for(let i=1; i<res.length-1; i++){ temp.push({ x: res[i-1].x*0.2 + res[i].x*0.6 + res[i+1].x*0.2, y: res[i-1].y*0.2 + res[i].y*0.6 + res[i+1].y*0.2 }); } temp.push(res[res.length-1]); res = temp; } return res; }
+
+        function generateEnvelopePolygon(points, style) {
+            if(points.length < 2) return []; const total = points.length; let lefts = [], rights = [], widths = [], normals = [];
+            for (let i = 0; i < total; i++) { const p = points[i]; let dx, dy; if (i === 0) { dx = points[1].x - p.x; dy = points[1].y - p.y; } else if (i === total - 1) { dx = p.x - points[i-1].x; dy = p.y - points[i-1].y; } else { dx = points[i+1].x - points[i-1].x; dy = points[i+1].y - points[i-1].y; } const len = Math.hypot(dx, dy) || 1; let nx = -dy / len, ny = dx / len; const width = getStrokeWidth(i, total, style, dx, dy); widths.push(width); normals.push({nx, ny}); lefts.push({ x: p.x + nx * width / 2, y: p.y + ny * width / 2 }); rights.push({ x: p.x - nx * width / 2, y: p.y - ny * width / 2 }); }
+            lefts = smoothEdge(lefts, 3); rights = smoothEdge(rights, 3); let poly = [], steps = 8;
+            let startAngle = Math.atan2(-normals[0].ny, -normals[0].nx); for(let i=0; i<=steps; i++) poly.push({ x: points[0].x + Math.cos(startAngle + Math.PI * (i/steps)) * widths[0]/2, y: points[0].y + Math.sin(startAngle + Math.PI * (i/steps)) * widths[0]/2 });
+            for(let i=1; i<total-1; i++) poly.push(lefts[i]);
+            let endAngle = Math.atan2(normals[total-1].ny, normals[total-1].nx); for(let i=0; i<=steps; i++) poly.push({ x: points[total-1].x + Math.cos(endAngle + Math.PI * (i/steps)) * widths[total-1]/2, y: points[total-1].y + Math.sin(endAngle + Math.PI * (i/steps)) * widths[total-1]/2 });
+            for(let i=total-2; i>0; i--) poly.push(rights[i]);
+            return poly;
+        }
+
+        function darkenColor(colorHex, percent) { if(!colorHex || colorHex[0] !== '#') return '#000000'; if(colorHex.length === 4) { colorHex = '#' + colorHex[1] + colorHex[1] + colorHex[2] + colorHex[2] + colorHex[3] + colorHex[3]; } let r = parseInt(colorHex.substring(1, 3), 16) || 0, g = parseInt(colorHex.substring(3, 5), 16) || 0, b = parseInt(colorHex.substring(5, 7), 16) || 0, f = 1 - (percent / 100); return "#" + ((1 << 24) + (Math.floor(r * f) << 16) + (Math.floor(g * f) << 8) + Math.floor(b * f)).toString(16).slice(1); }
+        function drawPolygonsCombined(context, polys) { context.beginPath(); polys.forEach(poly => { if (!poly || poly.length === 0) return; context.moveTo(poly[0].x, poly[0].y); for(let i=1; i<poly.length; i++) context.lineTo(poly[i].x, poly[i].y); context.closePath(); }); context.fill(); }
+
+        function drawTempStroke() {
+            tempCtx.clearRect(0, 0, tempCanvas.width, tempCanvas.height); if (!currentActiveStroke || currentActiveStroke.points.length < 2) return;
+            tempCtx.save(); tempCtx.translate(logicalWidth / 2, logicalHeight / 2); tempCtx.rotate(angle); tempCtx.scale(zoom, zoom); tempCtx.translate(-camX, -camY);
+            const smoothed = smoothPath(currentActiveStroke.points, currentActiveStroke.style.smoothingLevel);
+            
+            if (currentActiveStroke.style.penStyle === 'image_brush' && globalBrushImage) {
+                tempCtx.globalAlpha = 0.8; const thick = currentActiveStroke.style.thickness;
+                let drawRadial = (pts) => { 
+                    let imgToUse = globalBrushImage;
+                    if (currentActiveStroke.style.brushColorMode === 'color') imgToUse = getTintedBrush(globalBrushImage, solidColorEl.value);
+                    for(let i=0; i<pts.length-1; i++) { 
+                        let dx = pts[i+1].x-pts[i].x, dy = pts[i+1].y-pts[i].y, ang = Math.atan2(dy, dx); 
+                        tempCtx.save(); tempCtx.translate(pts[i].x, pts[i].y); tempCtx.rotate(ang); 
+                        tempCtx.drawImage(imgToUse, -thick/2, -thick/2, thick, thick); 
+                        tempCtx.restore(); 
+                    } 
+                }; 
+                drawRadial(smoothed);
+                if (symmetryModeEl.value.startsWith('radial_')) { const parts = parseInt(symmetryModeEl.value.split('_')[1]); for(let i=1; i<parts; i++) { tempCtx.save(); tempCtx.rotate((Math.PI*2*i)/parts); drawRadial(smoothed); tempCtx.restore(); } } else if (symmetryModeEl.value !== 'none') { let globalMinX=Infinity, globalMaxX=-Infinity; strokes.forEach(s=>s.points.forEach(p=>{globalMinX=Math.min(globalMinX,p.x); globalMaxX=Math.max(globalMaxX,p.x);})); if(strokes.length===0){globalMinX=0;globalMaxX=0;} let shapeW=globalMaxX-globalMinX||1, symOffsetShift=-(parseFloat(symOffsetEl.value)/100)*shapeW, mirrored=[]; if (symmetryModeEl.value === 'mirror_right') mirrored = smoothed.map(p=>({x: 2*globalMaxX-p.x+symOffsetShift, y:p.y})); else if (symmetryModeEl.value === 'mirror_left') mirrored = smoothed.map(p=>({x: 2*globalMinX-p.x-symOffsetShift, y:p.y})); drawRadial(mirrored); }
+            } else {
+                const poly = generateEnvelopePolygon(smoothed, currentActiveStroke.style); tempCtx.fillStyle = solidColorEl.value; drawPolygonsCombined(tempCtx, [poly]);
+                if (symmetryModeEl.value.startsWith('radial_')) { const parts = parseInt(symmetryModeEl.value.split('_')[1]); for(let i=1; i<parts; i++) { tempCtx.save(); tempCtx.rotate((Math.PI*2*i)/parts); drawPolygonsCombined(tempCtx, [poly]); tempCtx.restore(); } }
+                else if (symmetryModeEl.value !== 'none') { let globalMinX=Infinity, globalMaxX=-Infinity; strokes.forEach(s=>s.points.forEach(p=>{globalMinX=Math.min(globalMinX,p.x); globalMaxX=Math.max(globalMaxX,p.x);})); if(strokes.length===0){globalMinX=0;globalMaxX=0;} let shapeW=globalMaxX-globalMinX||1, symOffsetShift=-(parseFloat(symOffsetEl.value)/100)*shapeW, mirroredPoly=[]; if (symmetryModeEl.value === 'mirror_right') mirroredPoly = poly.map(p=>({x: 2*globalMaxX-p.x+symOffsetShift, y:p.y})).reverse(); else if (symmetryModeEl.value === 'mirror_left') mirroredPoly = poly.map(p=>({x: 2*globalMinX-p.x-symOffsetShift, y:p.y})).reverse(); drawPolygonsCombined(tempCtx, [mirroredPoly]); }
+            }
+            tempCtx.restore();
+        }
+
+        function getPolygonSVG(poly) { let d = `M ${poly[0].x} ${poly[0].y} `; for(let i=1; i<poly.length; i++) d += `L ${poly[i].x} ${poly[i].y} `; return `<path d="${d}Z" fill-rule="nonzero" stroke="none" />`; }
+
+        function redrawAll(returnSVG = false, targetCtx = ctx, indicesToRender = null) {
+            let svgContent = ""; 
+            if (!returnSVG) { targetCtx.clearRect(0, 0, canvas.width, canvas.height); targetCtx.save(); targetCtx.translate(logicalWidth / 2, logicalHeight / 2); targetCtx.rotate(angle); targetCtx.scale(zoom, zoom); targetCtx.translate(-camX, -camY); }
+            
+            let globalMinX = Infinity, globalMaxX = -Infinity, globalMinY = Infinity, globalMaxY = -Infinity, polys = [], smooths = [];
+            if (strokes.length > 0) { 
+                strokes.forEach(stroke => { 
+                    if (stroke.points.length < 2) { polys.push([]); smooths.push([]); return; } 
+                    const smoothed = smoothPath(stroke.points, stroke.style.smoothingLevel); smooths.push(smoothed);
+                    if(stroke.style.penStyle === 'image_brush') { polys.push([]); } else {
+                        const poly = generateEnvelopePolygon(smoothed, stroke.style); polys.push(poly); 
+                        poly.forEach(p => { globalMinX = Math.min(globalMinX, p.x); globalMaxX = Math.max(globalMaxX, p.x); globalMinY = Math.min(globalMinY, p.y); globalMaxY = Math.max(globalMaxY, p.y); }); 
+                    }
+                }); 
+            } else { globalMinX = 0; globalMaxX = 0; globalMinY = 0; globalMaxY = 0; }
+            
+            let shapeW = globalMaxX - globalMinX || 1, symOffsetShift = -(parseFloat(symOffsetEl.value) / 100) * shapeW, gradMinX = globalMinX, gradMaxX = globalMaxX;
+            if (symmetryModeEl.value === 'mirror_right') gradMaxX = Math.max(globalMaxX, 2 * globalMaxX - globalMinX + symOffsetShift); 
+            else if (symmetryModeEl.value === 'mirror_left') gradMinX = Math.min(globalMinX, 2 * globalMinX - globalMaxX - symOffsetShift);
+            
+            let currentFillStyle = solidColorEl.value, baseColorForDepth = solidColorEl.value, isGradient = false, gradColors = [], gradAngleRad, gradW, gradH, gradCx, gradCy, gradR;
+            if (fillTypeEl.value === 'gradient') {
+                isGradient = true; gradColors = Array.from(document.querySelectorAll('#gradient-colors .grad-color')).map(i => i.value); if(gradColors.length > 0) baseColorForDepth = gradColors[0]; if(gradColors.length === 1) gradColors.push(gradColors[0]);
+                gradAngleRad = (parseFloat(gradAngleEl.value) - 90) * Math.PI / 180; gradW = gradMaxX - gradMinX || 1; gradH = globalMaxY - globalMinY || 1; gradCx = gradMinX + gradW / 2; gradCy = globalMinY + gradH / 2; gradR = (Math.abs(gradW * Math.cos(gradAngleRad)) + Math.abs(gradH * Math.sin(gradAngleRad))) / 2;
+                if(!returnSVG) { const grad = targetCtx.createLinearGradient(gradCx - Math.cos(gradAngleRad) * gradR, gradCy - Math.sin(gradAngleRad) * gradR, gradCx + Math.cos(gradAngleRad) * gradR, gradCy + Math.sin(gradAngleRad) * gradR); gradColors.forEach((c, i) => grad.addColorStop(i / (gradColors.length - 1), c)); currentFillStyle = grad; }
+                else { currentFillStyle = "url(#mainGrad)"; }
+            } else if (fillTypeEl.value === 'image' && patternImage) { baseColorForDepth = '#888888'; if(!returnSVG) currentFillStyle = targetCtx.createPattern(patternImage, 'repeat'); else currentFillStyle = "url(#mainPat)"; }
+            
+            if (!returnSVG && (symmetryModeEl.value === 'mirror_right' || symmetryModeEl.value === 'mirror_left') && appMode === 'draw') { let axisX = symmetryModeEl.value === 'mirror_right' ? globalMaxX + symOffsetShift/2 : globalMinX - symOffsetShift/2; if (strokes.length === 0) axisX = 0; targetCtx.beginPath(); targetCtx.moveTo(axisX, -50000); targetCtx.lineTo(axisX, 50000); targetCtx.strokeStyle = 'rgba(212, 175, 55, 0.2)'; targetCtx.lineWidth = 1/zoom; targetCtx.setLineDash([5/zoom, 5/zoom]); targetCtx.stroke(); targetCtx.setLineDash([]); }
+            
+            if (strokes.length > 0) {
+                let processedGroups = new Set();
+                
+                strokes.forEach((stroke, index) => {
+                    if (indicesToRender && !indicesToRender.includes(index)) return; 
+                    
+                    let isGroup = stroke.groupId != null;
+                    let groupIndices = [index];
+
+                    if (isGroup) {
+                        if (processedGroups.has(stroke.groupId)) return;
+                        processedGroups.add(stroke.groupId);
+                        groupIndices = [];
+                        strokes.forEach((s, i) => { if (s.groupId === stroke.groupId) { if (!indicesToRender || indicesToRender.includes(i)) groupIndices.push(i); } });
+                    }
+
+                    let currentPolys = isGroup ? groupIndices.map(i => polys[i]) : [polys[index]];
+                    let currentSmooths = isGroup ? groupIndices.map(i => smooths[i]) : [smooths[index]];
+                    
+                    let locMinX=Infinity, locMaxX=-Infinity, locMinY=Infinity, locMaxY=-Infinity;
+                    currentSmooths.forEach(sm => sm.forEach(p=>{ locMinX=Math.min(locMinX,p.x); locMaxX=Math.max(locMaxX,p.x); locMinY=Math.min(locMinY,p.y); locMaxY=Math.max(locMaxY,p.y); }));
+                    
+                    if(stroke.style.penStyle === 'image_brush') {
+                        let imgToDraw = globalBrushImage; 
+                        if(imgToDraw && !returnSVG) {
+                            let imgToUse = imgToDraw;
+                            if (stroke.style.brushColorMode === 'color') { imgToUse = getTintedBrush(imgToDraw, stroke.style.customColor || solidColorEl.value); }
+                            
+                            let drawPathGroup = (ptsArray) => { 
+                                ptsArray.forEach((pts, gIdx) => {
+                                    let st = strokes[groupIndices[gIdx]];
+                                    for(let i=0; i<pts.length-1; i++){ 
+                                        let dx=pts[i+1].x-pts[i].x, dy=pts[i+1].y-pts[i].y, ang=Math.atan2(dy,dx); 
+                                        targetCtx.save(); targetCtx.translate(pts[i].x,pts[i].y); targetCtx.rotate(ang); 
+                                        targetCtx.drawImage(imgToUse, -st.style.thickness/2, -st.style.thickness/2, st.style.thickness, st.style.thickness); 
+                                        targetCtx.restore(); 
+                                    } 
+                                });
+                            }; 
+                            
+                            drawPathGroup(currentSmooths);
+                            if (symmetryModeEl.value.startsWith('radial_')) { const parts = parseInt(symmetryModeEl.value.split('_')[1]); for(let i=1; i<parts; i++) { targetCtx.save(); targetCtx.rotate((Math.PI*2*i)/parts); drawPathGroup(currentSmooths); targetCtx.restore(); } } 
+                            else if (symmetryModeEl.value === 'mirror_right') { let mirGrp = currentSmooths.map(sm => sm.map(p=>({x: 2*globalMaxX-p.x+symOffsetShift, y:p.y}))); drawPathGroup(mirGrp); } 
+                            else if (symmetryModeEl.value === 'mirror_left') { let mirGrp = currentSmooths.map(sm => sm.map(p=>({x: 2*globalMinX-p.x-symOffsetShift, y:p.y}))); drawPathGroup(mirGrp); }
+                        }
+                    } else {
+                        let validPolys = currentPolys.filter(p => p && p.length > 0);
+                        if (validPolys.length === 0) return; 
+
+                        let localFillStyle = currentFillStyle;
+                        let strokeMode = stroke.style.advStrokeMode || (stroke.style.customColor ? 'custom_solid' : 'global');
+                        let baseColorForExtrude = baseColorForDepth;
+
+                        if (strokeMode === 'custom_solid' && stroke.style.customColor) {
+                            localFillStyle = stroke.style.customColor;
+                            baseColorForExtrude = localFillStyle;
+                        } 
+                        else if (strokeMode === 'custom_gradient' && stroke.style.strokeGrad && stroke.style.strokeGrad.length === 2) {
+                            baseColorForExtrude = stroke.style.strokeGrad[0];
+                            if(!returnSVG) {
+                                let grad = targetCtx.createLinearGradient(locMinX, locMinY, locMaxX, locMaxY);
+                                grad.addColorStop(0, stroke.style.strokeGrad[0]);
+                                grad.addColorStop(1, stroke.style.strokeGrad[1]);
+                                localFillStyle = grad;
+                            } else {
+                                let gradId = `strkGrad_${index}`;
+                                svgContent += `<defs><linearGradient id="${gradId}" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="${stroke.style.strokeGrad[0]}"/><stop offset="100%" stop-color="${stroke.style.strokeGrad[1]}"/></linearGradient></defs>`;
+                                localFillStyle = `url(#${gradId})`;
+                            }
+                        }
+
+                        if (stroke.style.fillInteriorType && stroke.style.fillInteriorType !== 'none') {
+                            let intFillStyle = '#e74c3c';
+                            if (stroke.style.fillInteriorType === 'solid' && stroke.style.interiorColor) {
+                                intFillStyle = stroke.style.interiorColor;
+                            } else if (stroke.style.fillInteriorType === 'gradient') {
+                                let fColors = stroke.style.interiorGradColors || stroke.style.interiorGrad || ['#00ff00', '#ffff00'];
+                                let fAngleRad = ((stroke.style.interiorGradAngle !== undefined ? stroke.style.interiorGradAngle : 45) - 90) * Math.PI / 180;
+                                let fGradW = locMaxX - locMinX || 1;
+                                let fGradH = locMaxY - locMinY || 1;
+                                let fGradCx = locMinX + fGradW / 2;
+                                let fGradCy = locMinY + fGradH / 2;
+                                let fGradR = (Math.abs(fGradW * Math.cos(fAngleRad)) + Math.abs(fGradH * Math.sin(fAngleRad))) / 2;
+
+                                if(!returnSVG) {
+                                    let grad = targetCtx.createLinearGradient(
+                                        fGradCx - Math.cos(fAngleRad) * fGradR, fGradCy - Math.sin(fAngleRad) * fGradR, 
+                                        fGradCx + Math.cos(fAngleRad) * fGradR, fGradCy + Math.sin(fAngleRad) * fGradR
+                                    );
+                                    fColors.forEach((c, i) => grad.addColorStop(i / (fColors.length - 1 || 1), c));
+                                    intFillStyle = grad;
+                                } else {
+                                    let gradId = `fillGrad_${index}`;
+                                    let defs = `<linearGradient id="${gradId}" x1="${fGradCx - Math.cos(fAngleRad)*fGradR}" y1="${fGradCy - Math.sin(fAngleRad)*fGradR}" x2="${fGradCx + Math.cos(fAngleRad)*fGradR}" y2="${fGradCy + Math.sin(fAngleRad)*fGradR}" gradientUnits="userSpaceOnUse">`;
+                                    fColors.forEach((c, i) => { defs += `<stop offset="${(i/(fColors.length-1||1))*100}%" stop-color="${c}"/>`; });
+                                    defs += `</linearGradient>`;
+                                    svgContent += `<defs>${defs}</defs>`;
+                                    intFillStyle = `url(#${gradId})`;
+                                }
+                            }
+                            
+                            let drawInterior = (ptsArray, rAngleStr = "") => {
+                                if(!returnSVG) {
+                                    targetCtx.save(); targetCtx.fillStyle = intFillStyle;
+                                    drawPolygonsCombined(targetCtx, ptsArray);
+                                    targetCtx.restore();
+                                } else {
+                                    let polySVG = ptsArray.map(p => getPolygonSVG(p)).join('');
+                                    svgContent += `<g transform="${rAngleStr}" fill="${intFillStyle}">${polySVG}</g>`;
+                                }
+                            };
+                            
+                            let fillPathArray = isGroup ? [mergeGroupPaths(currentSmooths)] : currentSmooths;
+                            
+                            // --- הפתרון לבקשתך: מילוי חזר לעבוד על כל קו, ללא סינון הגבלת מרחק ---
+                            if (fillPathArray.length > 0) {
+                                drawInterior(fillPathArray);
+                                if (symmetryModeEl.value.startsWith('radial_')) { const parts = parseInt(symmetryModeEl.value.split('_')[1]); for(let i=1; i<parts; i++) { if(!returnSVG) { targetCtx.save(); targetCtx.rotate((Math.PI*2*i)/parts); drawInterior(fillPathArray); targetCtx.restore(); } else { drawInterior(fillPathArray, `rotate(${(360*i)/parts})`); } } } 
+                                else if (symmetryModeEl.value === 'mirror_right') { let mirGrp = fillPathArray.map(sm => sm.map(p=>({x: 2*globalMaxX-p.x+symOffsetShift, y:p.y})).reverse()); drawInterior(mirGrp); } 
+                                else if (symmetryModeEl.value === 'mirror_left') { let mirGrp = fillPathArray.map(sm => sm.map(p=>({x: 2*globalMinX-p.x-symOffsetShift, y:p.y})).reverse()); drawInterior(mirGrp); }
+                            }
+                        }
+                        
+                        let origAngleRad = stroke.effect3D.angle * Math.PI / 180; let resolvedDepthColor = stroke.effect3D.depthColor;
+                        let dAmt = stroke.effect3D.depthDarken !== undefined ? stroke.effect3D.depthDarken : 40;
+                        if (stroke.effect3D.depthColorMode === 'auto') { 
+                            if (strokeMode !== 'global') {
+                                resolvedDepthColor = darkenColor(baseColorForExtrude, dAmt);
+                            } else if (isGradient) {
+                                if (returnSVG) { resolvedDepthColor = `url(#darkGrad_${dAmt})`; } 
+                                else { const darkGrad = targetCtx.createLinearGradient(gradCx - Math.cos(gradAngleRad) * gradR, gradCy - Math.sin(gradAngleRad) * gradR, gradCx + Math.cos(gradAngleRad) * gradR, gradCy + Math.sin(gradAngleRad) * gradR); gradColors.forEach((c, i) => darkGrad.addColorStop(i / (gradColors.length - 1), darkenColor(c, dAmt))); resolvedDepthColor = darkGrad; } 
+                            } else { resolvedDepthColor = darkenColor(baseColorForExtrude, dAmt); } 
+                        }
+                        
+                        let drawVector = (polyArray, rAngleStr = "") => { 
+                            if(!returnSVG) { 
+                                if (stroke.style.thickness > 0) { 
+                                    if(stroke.effect3D.type === 'extrude') { 
+                                        for(let d=stroke.effect3D.depth; d>=1; d--) { 
+                                            targetCtx.save(); targetCtx.translate(Math.cos(origAngleRad)*d, Math.sin(origAngleRad)*d); 
+                                            targetCtx.fillStyle = resolvedDepthColor; drawPolygonsCombined(targetCtx, polyArray); targetCtx.restore(); 
+                                        } 
+                                    } 
+                                    else if(stroke.effect3D.type === 'shadow') { 
+                                        targetCtx.save(); targetCtx.shadowBlur = 1*zoom; targetCtx.shadowColor='rgba(0,0,0,0.6)'; 
+                                        targetCtx.shadowOffsetX=Math.cos(origAngleRad)*stroke.effect3D.depth*zoom; 
+                                        targetCtx.shadowOffsetY=Math.sin(origAngleRad)*stroke.effect3D.depth*zoom; 
+                                        targetCtx.fillStyle=localFillStyle; drawPolygonsCombined(targetCtx, polyArray); targetCtx.restore(); 
+                                    } 
+                                    targetCtx.fillStyle = localFillStyle; drawPolygonsCombined(targetCtx, polyArray); 
+                                }
+                            } else {
+                                if (stroke.style.thickness > 0) {
+                                    let polySVG = polyArray.map(p => getPolygonSVG(p)).join('');
+                                    let out = "";
+                                    if (stroke.effect3D.type === 'shadow') { out += `<g transform="${rAngleStr} translate(${Math.cos(origAngleRad)*stroke.effect3D.depth}, ${Math.sin(origAngleRad)*stroke.effect3D.depth})" opacity="0.4" fill="#000">${polySVG}</g>`; }
+                                    else if (stroke.effect3D.type === 'extrude') { for (let d = stroke.effect3D.depth; d >= 1; d--) { out += `<g transform="${rAngleStr} translate(${Math.cos(origAngleRad)*d}, ${Math.sin(origAngleRad)*d})" fill="${resolvedDepthColor}">${polySVG}</g>`; } }
+                                    out += `<g transform="${rAngleStr}" fill="${localFillStyle}">${polySVG}</g>`;
+                                    svgContent += out;
+                                }
+                            }
+                        };
+                        
+                        drawVector(validPolys);
+                        
+                        if (symmetryModeEl.value.startsWith('radial_')) { 
+                            const parts = parseInt(symmetryModeEl.value.split('_')[1]); 
+                            for(let i=1; i<parts; i++) { 
+                                if(!returnSVG) { targetCtx.save(); targetCtx.rotate((Math.PI*2*i)/parts); drawVector(validPolys); targetCtx.restore(); } 
+                                else { drawVector(validPolys, `rotate(${(360*i)/parts})`); }
+                            } 
+                        } else if (symmetryModeEl.value === 'mirror_right') { 
+                            let mirPolyArray = validPolys.map(poly => poly.map(p=>({x: 2*globalMaxX-p.x+symOffsetShift, y:p.y})).reverse()); 
+                            drawVector(mirPolyArray); 
+                        } else if (symmetryModeEl.value === 'mirror_left') { 
+                            let mirPolyArray = validPolys.map(poly => poly.map(p=>({x: 2*globalMinX-p.x-symOffsetShift, y:p.y})).reverse()); 
+                            drawVector(mirPolyArray); 
+                        }
+                    }
+
+                    if (!returnSVG) {
+                        groupIndices.forEach(idx => {
+                            if (selectedIndices.includes(idx)) {
+                                const b = getMultiStrokeBounds([idx]);
+                                if (appMode === 'edit') { 
+                                    targetCtx.strokeStyle = '#3498db'; targetCtx.lineWidth = 2/zoom; targetCtx.setLineDash([4/zoom, 4/zoom]); targetCtx.strokeRect(b.minX, b.minY, b.maxX - b.minX, b.maxY - b.minY); targetCtx.setLineDash([]); targetCtx.fillStyle = '#fff'; 
+                                    const s = 10 / zoom, midX = (b.minX + b.maxX) / 2, rotY = b.minY - 40/zoom; targetCtx.beginPath(); targetCtx.moveTo(midX, b.minY); targetCtx.lineTo(midX, rotY); targetCtx.stroke(); targetCtx.beginPath(); targetCtx.arc(midX, rotY, s/1.5, 0, Math.PI*2); targetCtx.fill(); targetCtx.stroke(); targetCtx.fillRect(b.minX-s/2, b.minY-s/2, s, s); targetCtx.strokeRect(b.minX-s/2, b.minY-s/2, s, s); targetCtx.fillRect(b.maxX-s/2, b.minY-s/2, s, s); targetCtx.strokeRect(b.maxX-s/2, b.minY-s/2, s, s); targetCtx.fillRect(b.minX-s/2, b.maxY-s/2, s, s); targetCtx.strokeRect(b.minX-s/2, b.maxY-s/2, s, s); targetCtx.fillRect(b.maxX-s/2, b.maxY-s/2, s, s); targetCtx.strokeRect(b.maxX-s/2, b.maxY-s/2, s, s); 
+                                } else if ((appMode === 'lengthen' || appMode === 'shorten') && selectedIndices.length === 1) { const pts = strokes[idx].points, s = 12 / zoom; targetCtx.beginPath(); targetCtx.arc(pts[0].x, pts[0].y, s, 0, Math.PI*2); targetCtx.fillStyle = '#2ecc71'; targetCtx.fill(); targetCtx.stroke(); targetCtx.beginPath(); targetCtx.arc(pts[pts.length-1].x, pts[pts.length-1].y, s, 0, Math.PI*2); targetCtx.fillStyle = '#e74c3c'; targetCtx.fill(); targetCtx.stroke(); } 
+                                else if (appMode === 'edit-thickness' && selectedIndices.length === 1) { const st = strokes[idx], pts = st.points, s = 12 / zoom, pk = Math.floor(st.style.thicknessPeak*(pts.length-1)); if(pts[pk]) { targetCtx.beginPath(); targetCtx.arc(pts[pk].x, pts[pk].y, s, 0, Math.PI*2); targetCtx.fillStyle = '#f1c40f'; targetCtx.fill(); targetCtx.stroke(); } }
+                            }
+                        });
+                    }
+                });
+            }
+            if (!returnSVG) targetCtx.restore(); 
+            return svgContent;
+        }
+
+        function generateSVGContent() {
+            let svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${logicalWidth} ${logicalHeight}" width="${logicalWidth}" height="${logicalHeight}"><defs>`;
+            if (fillTypeEl.value === 'gradient') {
+                const angleRad = (parseFloat(gradAngleEl.value) - 90) * Math.PI / 180; let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity; strokes.forEach(s => s.points.forEach(p => { minX=Math.min(minX,p.x); maxX=Math.max(maxX,p.x); minY=Math.min(minY,p.y); maxY=Math.max(maxY,p.y); }));
+                let shapeW = maxX - minX || 1, symOffsetShift = -(parseFloat(symOffsetEl.value) / 100) * shapeW, gradMinX = minX, gradMaxX = maxX;
+                if (symmetryModeEl.value === 'mirror_right') gradMaxX = Math.max(maxX, 2 * maxX - minX + symOffsetShift); else if (symmetryModeEl.value === 'mirror_left') gradMinX = Math.min(minX, 2 * minX - maxX - symOffsetShift);
+                const w = gradMaxX - gradMinX || 1, h = maxY - minY || 1, cx = gradMinX + w/2, cy = minY + h/2, r = (Math.abs(w * Math.cos(angleRad)) + Math.abs(h * Math.sin(angleRad))) / 2;
+                svg += `<linearGradient id="mainGrad" x1="${cx - Math.cos(angleRad)*r}" y1="${cy - Math.sin(angleRad)*r}" x2="${cx + Math.cos(angleRad)*r}" y2="${cy + Math.sin(angleRad)*r}" gradientUnits="userSpaceOnUse">`;
+                const colors = Array.from(document.querySelectorAll('#gradient-colors .grad-color')).map(i => i.value); if(colors.length===1) colors.push(colors[0]); colors.forEach((c, i) => { svg += `<stop offset="${(i/(colors.length-1))*100}%" stop-color="${c}" />`; }); svg += `</linearGradient>`;
+                let processedDarkens = new Set(); strokes.forEach(s => { if (s.effect3D && s.effect3D.depthColorMode === 'auto') { let dAmt = s.effect3D.depthDarken !== undefined ? s.effect3D.depthDarken : 40; if (!processedDarkens.has(dAmt)) { processedDarkens.add(dAmt); svg += `<linearGradient id="darkGrad_${dAmt}" x1="${cx - Math.cos(angleRad)*r}" y1="${cy - Math.sin(angleRad)*r}" x2="${cx + Math.cos(angleRad)*r}" y2="${cy + Math.sin(angleRad)*r}" gradientUnits="userSpaceOnUse">`; colors.forEach((c, i) => { svg += `<stop offset="${(i/(colors.length-1))*100}%" stop-color="${darkenColor(c, dAmt)}" />`; }); svg += `</linearGradient>`; } } });
+            } else if (fillTypeEl.value === 'image' && patternImage) { svg += `<pattern id="mainPat" patternUnits="userSpaceOnUse" width="${patternImage.width}" height="${patternImage.height}"><image href="${patternImage.src}" x="0" y="0" width="${patternImage.width}" height="${patternImage.height}" /></pattern>`; }
+            
+            const projectData = { strokes: strokes, gradientColors: getGradientColors(), patternImageSrc: patternImage ? patternImage.src : null };
+            const encodedData = btoa(unescape(encodeURIComponent(JSON.stringify(projectData))));
+            
+            const angleDeg = angle * 180 / Math.PI; 
+            svg += `</defs><desc id="eitoran-data">${encodedData}</desc><g transform="translate(${logicalWidth/2}, ${logicalHeight/2}) rotate(${angleDeg}) scale(${zoom}) translate(${-camX}, ${-camY})">`; 
+            svg += redrawAll(true); 
+            svg += `</g></svg>`;
+            return svg;
+        }
+
+        document.getElementById('download-svg-btn').addEventListener('click', () => {
+            const svg = generateSVGContent();
+            // Embedded in KioskLock's smart-display editor (the page runs inside its ornament window): the SVG goes
+            // straight to the editor, which adds it to the screen — no file, no copy and paste.
+            if (window.parent && window.parent !== window) { try { window.parent.postMessage({ klOrnament: svg }, '*'); return; } catch (e) { } }
+            if (window.pywebview) window.pywebview.api.save_file(svg, "Flourish_STUDIO_PRO.svg", false); 
+            else { const link = document.createElement("a"); link.href = URL.createObjectURL(new Blob([svg], {type: "image/svg+xml;charset=utf-8"})); link.download = "Flourish_STUDIO_PRO.svg"; link.click(); }
+        });
+
+        document.getElementById('download-png-btn').addEventListener('click', () => {
+            const wasEdit = appMode; setAppMode('draw'); redrawAll(); const dataUrl = canvas.toDataURL('image/png');
+            if (window.pywebview) window.pywebview.api.save_file(dataUrl, "Flourish_Design_PRO.png", true); 
+            else { const link = document.createElement('a'); link.download = 'Flourish_Design_PRO.png'; link.href = dataUrl; link.click(); }
+            setAppMode(wasEdit);
+        });
+
+        const BACKEND_URL = 'https://eitoran.vercel.app/api/upload';
+
+        document.getElementById('save-to-drive-btn').addEventListener('click', async () => {
+            const projectName = prompt('בחר שם לעיטור שלך (יופיע בגלריה הציבורית):', 'עיטור חדש');
+            if (projectName === null) return;
+
+            if (!isSafeText(projectName)) {
+                alert('שם העיטור אינו חוקי. אנא השתמש באותיות, מספרים ורווחים בלבד (ללא סימנים מיוחדים).');
+                return;
+            }
+
+            const btn = document.getElementById('save-to-drive-btn');
+            const originalText = btn.innerHTML;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> שומר עיטור...';
+            btn.disabled = true;
+
+            const fileContent = generateSVGContent();
+
+            try {
+                const response = await fetch(BACKEND_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ svgContent: fileContent, customName: projectName }) 
+                });
+
+                const result = await response.json();
+                if (response.ok) { alert('הקובץ נשמר בהצלחה בגלריה הציבורית!'); } 
+                else { alert('שגיאה בהעלאה: ' + (result.error || 'שגיאה לא ידועה')); }
+            } catch (err) {
+                console.error(err);
+                alert('אירעה שגיאה בחיבור לשרת השמירה.');
+            } finally {
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+            }
+        });
+
+        window.addEventListener('DOMContentLoaded', () => {
+            const importedSvg = localStorage.getItem('importSvgToEitoran');
+            if (importedSvg) {
+                localStorage.removeItem('importSvgToEitoran');
+                setTimeout(() => {
+                    try {
+                        const parser = new DOMParser();
+                        const doc = parser.parseFromString(importedSvg, "image/svg+xml");
+                        const descTag = doc.getElementById('eitoran-data');
+
+                        if (descTag && descTag.textContent) {
+                            const pd = JSON.parse(decodeURIComponent(escape(atob(descTag.textContent))));
+                            strokes = pd.strokes || [];
+                            undoStack = []; redoStack = []; 
+                            if (pd.gradientColors) setGradientColors(pd.gradientColors);
+                            selectedIndices = []; lengthTools.style.display = 'none';
+                            
+                            if (pd.patternImageSrc) {
+                                const img = new Image(); 
+                                img.onload = () => { patternImage = img; updateCamInfo(); redrawAll(); updateLayersPanel(); }; 
+                                img.src = pd.patternImageSrc;
+                            } else { patternImage = null; updateCamInfo(); redrawAll(); updateLayersPanel(); }
+                        } else { processSvgString(importedSvg); }
+                    } catch (err) { console.error("שגיאה:", err); processSvgString(importedSvg); }
+                    switchTab('edit');
+                }, 100);
+            }
+            
+            const btnThemeToggle = document.getElementById('btn-theme-toggle');
+            // KioskLock: the editor's theme arrives by message (or ?theme= at load); the button still flips it by hand.
+            const klTheme = window.__klTheme;
+            klTheme(document.body.classList.contains('light-theme'));   // the icon, now that the button is here
+            btnThemeToggle.addEventListener('click', () => klTheme(!document.body.classList.contains('light-theme')));
+            
+            document.getElementById('mobile-toggle-btn').addEventListener('click', () => {
+                document.body.classList.toggle('sidebar-collapsed');
+                setTimeout(resize, 300);
+            });
+        });
+
+        updateCursorSize(); resize(); updateLayersPanel();
+    </script>
+</body>
+</html>

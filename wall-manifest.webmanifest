@@ -1,0 +1,17 @@
+{
+  "name": "צג חכם לבית כנסת",
+  "short_name": "הצג",
+  "description": "הצג החכם של בית הכנסת — זמני תפילות, זמני היום, מודעות ולוחות.",
+  "start_url": "./wall.html",
+  "scope": "./",
+  "display": "fullscreen",
+  "display_override": ["fullscreen", "standalone"],
+  "orientation": "landscape",
+  "background_color": "#000000",
+  "theme_color": "#0b1a2e",
+  "lang": "he",
+  "dir": "rtl",
+  "icons": [
+    { "src": "./lock-mark.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}
